@@ -1,0 +1,32 @@
+{
+  "environment": {
+    "max_steps_per_episode": 365
+  },
+  "agent": {
+    "hidden_size": 64,
+    "n_layers": 3,
+    "lr": 0.0001,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "entropy_coef": 0.01,
+    "value_loss_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "device": "cpu"
+  },
+  "training": {
+    "n_episodes": 500,
+    "max_steps_per_episode": 365,
+    "update_frequency": 1,
+    "eval_frequency": 50,
+    "n_eval_episodes": 10,
+    "save_frequency": 100
+  },
+  "baseline": {
+    "tune": true,
+    "tuning_episodes": 10,
+    "tuning_maxiter": 50
+  },
+  "evaluation": {
+    "n_episodes": 100
+  }
+}
