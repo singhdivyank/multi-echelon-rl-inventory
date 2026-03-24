@@ -48,7 +48,7 @@ def load_config(config_path: str = None) -> dict:
             'entropy_coef': 0.01,
             'value_loss_coef': 0.5,
             'max_grad_norm': 0.5,
-            'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+            'device': 'auto',
         },
         'training': {
             'n_episodes': 500,

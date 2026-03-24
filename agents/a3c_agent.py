@@ -10,17 +10,13 @@ Implementation following the paper specifications:
 Author: AI/ML Engineering Team
 """
 
-# import platform
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 import numpy as np
-from typing import Tuple, List
-
-# mac_version = int(platform.mac_ver()[0].split('.')[0])
+from typing import Dict, Tuple, List
 
 
 class ActorCriticNetwork(nn.Module):
@@ -172,7 +168,7 @@ class A3CAgent:
         max_grad_norm: float = 0.5,
         device: str = 'cpu'
     ):
-        self.device = self._get_device()
+        self.device = self._get_device(device)
         
         # Hyperparameters
         self.gamma = gamma
@@ -195,27 +191,29 @@ class A3CAgent:
         # Training mode
         self.network.train()
     
-    def _get_device(self):
+    def _get_device(self, device: str = 'auto'):
         """
-        Get the default device.
+        Get the compute device.
+        If device is 'auto', auto-detect best available device.
+        Otherwise use the specified device.
         """
+        if device not in ('auto', None):
+            resolved = torch.device(device)
+            print(f"Using {str(resolved).upper()} device")
+            return resolved
 
-        device = torch.device("cpu")
-        print("Using CPU device")
-        
-        # if mac_version >= 14 and torch.backends.mps.is_built():
-        #     device = torch.device("mps")
-        #     print("Using MPS device")
-        
+        # Auto-detect best device
         if torch.cuda.is_available():
-            device = torch.device("cuda")
-            print("Using CUDA device")
+            try:
+                # Validate CUDA actually works
+                _ = torch.zeros(1, device='cuda')
+                print("Using CUDA device")
+                return torch.device("cuda")
+            except RuntimeError:
+                print("CUDA reported available but failed — falling back to CPU")
         
-        if torch.backends.mps.is_available():
-            device = torch.device("mps")
-            print("Using MPS device")
-        
-        return device
+        print("Using CPU device")
+        return torch.device("cpu")
 
     
     def select_action(
@@ -375,11 +373,6 @@ class A3CAgent:
     def train_mode(self):
         """Set network to training mode"""
         self.network.train()
-
-
-# For compatibility
-import torch
-from typing import Dict
 
 
 def create_agent(config: Dict, state_dim: int, action_dim: int) -> A3CAgent:

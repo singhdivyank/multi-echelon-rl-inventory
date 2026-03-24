@@ -12,6 +12,7 @@ Author: AI/ML Engineering Team
 
 import numpy as np
 import torch
+import re
 from typing import Dict, Optional
 from tqdm import tqdm
 import json
@@ -81,23 +82,44 @@ class Trainer:
     
     def train(self) -> Dict:
         """
-        Main training loop
+        Main training loop with automatic checkpoint resume support.
+        
+        If a previous checkpoint exists in save_dir, training will
+        automatically resume from the last saved episode.
         
         Returns:
             Training history dictionary
         """
-        print(f"Starting training for {self.n_episodes} episodes...")
+        # --- Checkpoint resume ---
+        start_episode = 0
+        latest_ckpt = self._find_latest_checkpoint()
+        if latest_ckpt is not None:
+            start_episode = self._load_checkpoint(latest_ckpt)
+            print(f"Resumed from checkpoint: {latest_ckpt} (episode {start_episode})")
+        
+        print(f"Starting training for {self.n_episodes} episodes "
+              f"(episodes {start_episode + 1}–{self.n_episodes})...")
         print(f"Environment: {self.env.__class__.__name__}")
         print(f"Agent: {self.agent.__class__.__name__}")
         print(f"Save directory: {self.save_dir}")
         
+        if start_episode >= self.n_episodes:
+            print("Training already complete based on checkpoint. Skipping.")
+            return self.training_history
+        
         # Recent episodes for moving average
         recent_rewards = deque(maxlen=100)
+        # Pre-fill from restored history
+        for r in self.training_history['episode_rewards'][-100:]:
+            recent_rewards.append(r)
         
-        # Progress bar
-        pbar = tqdm(range(self.n_episodes), desc="Training")
+        # Progress bar starting from the resumed episode
+        remaining = self.n_episodes - start_episode
+        pbar = tqdm(range(remaining), desc="Training", initial=0, total=remaining)
         
-        for episode in pbar:
+        for i in pbar:
+            episode = start_episode + i
+            
             # Run episode
             episode_metrics = self._run_episode(episode)
             
@@ -111,6 +133,7 @@ class Trainer:
             
             # Update progress bar
             pbar.set_postfix({
+                'ep': episode + 1,
                 'reward': f"{episode_metrics['reward']:.2f}",
                 'avg_reward_100': f"{np.mean(recent_rewards):.2f}",
                 'service_level': f"{episode_metrics['service_level']:.2%}",
@@ -212,14 +235,11 @@ class Trainer:
             return None
         
         # Get next value (bootstrap)
-        if len(self.episode_buffer['states']) > 0:
-            last_state = self.episode_buffer['states'][-1]
-            state_tensor = torch.FloatTensor(last_state).to(self.agent.device)
-            with torch.no_grad():
-                _, next_value = self.agent.network.forward(state_tensor.unsqueeze(0))
-                next_value = next_value.item()
-        else:
-            next_value = 0
+        last_state = self.episode_buffer['states'][-1]
+        state_tensor = torch.FloatTensor(last_state).to(self.agent.device)
+        with torch.no_grad():
+            _, next_value = self.agent.network.forward(state_tensor.unsqueeze(0))
+            next_value = next_value.item()
         
         # Compute advantages and returns
         advantages, returns = self.agent.compute_gae(
@@ -285,11 +305,70 @@ class Trainer:
         }
     
     def _save_checkpoint(self, episode: int, final: bool = False):
-        """Save model checkpoint"""
+        """Save model checkpoint with full training state for resuming."""
         suffix = 'final' if final else f'ep{episode}'
         checkpoint_path = os.path.join(self.save_dir, f'checkpoint_{suffix}.pt')
-        self.agent.save(checkpoint_path)
-        print(f"\nCheckpoint saved: {checkpoint_path}")
+        
+        # Build checkpoint dict with training metadata
+        checkpoint = {
+            'network_state_dict': self.agent.network.state_dict(),
+            'optimizer_state_dict': self.agent.optimizer.state_dict(),
+            'episode': episode,
+            'total_steps': self.total_steps,
+            'training_history': self.training_history,
+        }
+        torch.save(checkpoint, checkpoint_path)
+        print(f"\nCheckpoint saved: {checkpoint_path} (episode {episode})")
+    
+    def _find_latest_checkpoint(self) -> Optional[str]:
+        """
+        Scan save_dir for the most recent checkpoint_ep*.pt file.
+        
+        Returns:
+            Path to latest checkpoint, or None if none found.
+        """
+        if not os.path.isdir(self.save_dir):
+            return None
+        
+        pattern = re.compile(r'checkpoint_ep(\d+)\.pt$')
+        best_ep = -1
+        best_path = None
+        
+        for fname in os.listdir(self.save_dir):
+            m = pattern.match(fname)
+            if m:
+                ep = int(m.group(1))
+                if ep > best_ep:
+                    best_ep = ep
+                    best_path = os.path.join(self.save_dir, fname)
+        
+        return best_path
+    
+    def _load_checkpoint(self, path: str) -> int:
+        """
+        Load checkpoint and restore training state.
+        
+        Args:
+            path: Path to checkpoint file.
+        
+        Returns:
+            The episode number to resume from.
+        """
+        checkpoint = torch.load(path, map_location=self.agent.device)
+        
+        # Restore model + optimizer
+        self.agent.network.load_state_dict(checkpoint['network_state_dict'])
+        self.agent.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        # Restore training metadata
+        episode = checkpoint.get('episode', 0)
+        self.total_steps = checkpoint.get('total_steps', 0)
+        
+        saved_history = checkpoint.get('training_history', None)
+        if saved_history is not None:
+            self.training_history = saved_history
+        
+        return episode
     
     def _save_training_history(self):
         """Save training history to JSON"""

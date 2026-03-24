@@ -13,12 +13,12 @@ agent:
   device: 'auto'
 
 training:
-  n_episodes: 5000
+  n_episodes: 50000
   max_steps_per_episode: 365
   update_frequency: 1
-  eval_frequency: 500
+  eval_frequency: 5000
   n_eval_episodes: 100
-  save_frequency: 1000
+  save_frequency: 5000
 
 baseline:
   tune: true
