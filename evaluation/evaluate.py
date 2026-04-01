@@ -57,7 +57,10 @@ def evaluate_agent(
         
         while not done:
             # Get action from agent
-            if hasattr(agent, 'get_action'):
+            # PPOAgent.get_action returns (action, log_prob, value);
+            # BaselineAgent.get_action returns just action
+            from agents.ppo_agent import PPOAgent
+            if isinstance(agent, PPOAgent):
                 action, _, _ = agent.get_action(state, deterministic=deterministic)
             else:
                 action = agent.get_action(state, deterministic=deterministic)
@@ -257,7 +260,8 @@ def evaluate_policy_heatmap(
             test_state[state_indices[1]] = Y[i, j]
             
             # Get action
-            if hasattr(agent, 'get_action'):
+            from agents.ppo_agent import PPOAgent
+            if isinstance(agent, PPOAgent):
                 action, _, _ = agent.get_action(test_state, deterministic=True)
             else:
                 action = agent.get_action(test_state, deterministic=True)

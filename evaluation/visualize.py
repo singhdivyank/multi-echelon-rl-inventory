@@ -2,6 +2,8 @@
 Visualization utilities for training and evaluation results
 """
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend — must be set before pyplot import
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Optional
@@ -49,17 +51,19 @@ def plot_training_curves(
     ax = axes[0, 0]
     if len(costs) > 0:
         smoothed_costs = moving_average(costs, window)
+        x_smooth = iterations[:len(smoothed_costs)]
+        cost_std = np.std(costs[:len(smoothed_costs)])
         ax.plot(
-            iterations[:len(smoothed_costs)], 
-            smoothed_costs, 
-            label='PPO', 
-            linewidth=2, 
+            x_smooth,
+            smoothed_costs,
+            label='PPO',
+            linewidth=2,
             color='#2E86AB'
         )
         ax.fill_between(
-            iterations[:len(costs)], 
-            moving_average(costs, window//2 if window > 1 else 1) - np.std(costs[:len(smoothed_costs)]),
-            moving_average(costs, window//2 if window > 1 else 1) + np.std(costs[:len(smoothed_costs)]),
+            x_smooth,
+            smoothed_costs - cost_std,
+            smoothed_costs + cost_std,
             alpha=0.3, color='#2E86AB'
         )
     

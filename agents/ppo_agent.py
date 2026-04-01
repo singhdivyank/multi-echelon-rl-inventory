@@ -123,7 +123,7 @@ class PPOAgent:
             value = self.actor_critic.critic(state_tensor)
             
             action = action.cpu().numpy()[0]
-            log_prob = log_prob.cpu().numpy()[0] if log_prob is not None else 0.0
+            log_prob = log_prob.cpu().item() if log_prob is not None else 0.0
             value = value.cpu().numpy()[0][0]
             
         return action, log_prob, value
@@ -211,11 +211,12 @@ class PPOAgent:
                 batch_states = states[batch_indices]
                 batch_actions = actions[batch_indices]
                 batch_old_log_probs = old_log_probs[batch_indices]
+                batch_old_values = values[batch_indices]  # critic predictions at collection time
                 batch_returns = returns[batch_indices]
                 batch_advantages = advantages[batch_indices]
                 
                 # Evaluate actions with current policy
-                log_probs, values, entropy = self.actor_critic.evaluate_actions(
+                log_probs, values_new, entropy = self.actor_critic.evaluate_actions(
                     batch_states,
                     batch_actions
                 )
@@ -233,10 +234,9 @@ class PPOAgent:
                 
                 policy_loss = -torch.min(surr1, surr2).mean()
                 
-                # Value loss (MSE)
-                # value_loss = nn.MSELoss()(values.squeeze(), batch_returns)
-                value_pred = values.squeeze()
-                value_old = batch_returns.detach()  # fallback if old values not stored
+                # Value loss with clipping (standard PPO value clipping)
+                value_pred = values_new.squeeze()
+                value_old = batch_old_values.squeeze().detach()
 
                 value_clipped = value_old + torch.clamp(
                     value_pred - value_old,

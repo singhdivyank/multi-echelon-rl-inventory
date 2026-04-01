@@ -139,16 +139,16 @@ def train_agents(args, config, env_config):
         config=config
     )
     
-    # make this dynamic
     ppo_stats = train_ppo(
         agent=ppo_agent,
         env=env,
-        num_iterations=10000,
+        num_iterations=config.get('iterations', 10000),
         logger=logger,
         save_dir=os.path.join(args.save_dir, 'checkpoints'),
         log_interval=args.log_interval,
         save_interval=args.save_interval,
-        eval_interval=500,
+        eval_interval=config.get('eval_interval', 500),
+        eval_episodes=config.get('eval_episodes', 10),
     )
     
     # Save final model
@@ -167,7 +167,7 @@ def train_agents(args, config, env_config):
         baseline_stats = evaluate_baseline(
             agent=baseline_agent,
             env=env,
-            num_episodes=args.episodes,
+            num_episodes=args.eval_episodes,
             logger=logger,
         )
         
@@ -182,7 +182,7 @@ def train_agents(args, config, env_config):
     # Plot training curves
     print("\nGenerating training plots...")
     plot_path = os.path.join(args.save_dir, 'plots', 'training_curves.png')
-    plot_training_curves(ppo_stats, baseline_stats, save_path=plot_path)
+    plot_training_curves(ppo_stats, baseline_stats, save_path=plot_path, show=False)
     print(f"Training curves saved to {plot_path}")
     
     # Save statistics
@@ -283,7 +283,7 @@ def evaluate_agents(args, config, env_config, ppo_agent=None, baseline_agent=Non
         # Plot comparison
         print("\nGenerating comparison plots...")
         comparison_path = os.path.join(args.save_dir, 'plots', 'comparison.png')
-        plot_comparison(ppo_results, baseline_results, save_path=comparison_path)
+        plot_comparison(ppo_results, baseline_results, save_path=comparison_path, show=False)
         print(f"Comparison plot saved to {comparison_path}")
     else:
         baseline_results = None
@@ -291,16 +291,20 @@ def evaluate_agents(args, config, env_config, ppo_agent=None, baseline_agent=Non
     # Generate heatmaps
     print("\nGenerating policy heatmaps...")
     heatmap_path = os.path.join(args.save_dir, 'plots', 'heatmap_ppo.png')
-    plot_heatmap(ppo_agent, env, save_path=heatmap_path)
+    plot_heatmap(ppo_agent, env, save_path=heatmap_path, show=False)
     print(f"Heatmap saved to {heatmap_path}")
     
     # Save evaluation results
+    improvement = None  # default when baseline is skipped
+    if baseline_results is not None:
+        improvement = (baseline_results['mean_cost'] - ppo_results['mean_cost']) / baseline_results['mean_cost'] * 100
+
     eval_results = {
         'ppo': ppo_results,
         'baseline': baseline_results,
-        'improvement': improvement if baseline_results else None,
+        'improvement': improvement,
     }
-    
+
     eval_path = os.path.join(args.save_dir, 'evaluation_results.json')
     with open(eval_path, 'w') as f:
         def convert(obj):
@@ -309,7 +313,7 @@ def evaluate_agents(args, config, env_config, ppo_agent=None, baseline_agent=Non
             elif isinstance(obj, (np.integer, np.floating)):
                 return float(obj)
             return obj
-        
+
         json.dump(eval_results, f, indent=2, default=convert)
     print(f"\nEvaluation results saved to {eval_path}")
     
@@ -331,11 +335,11 @@ def main():
     # Create directories
     create_directories(args.save_dir)
     
-    # Update config with command line arguments
-    config = _get_config()['ppo'].copy()
+    # Load config once
+    full_config = _get_config()
+    config = dict(full_config['ppo'])
     config['seed'] = args.seed
-    
-    env_config = _get_config()['divergent'].copy()
+    env_config = dict(full_config['divergent'])
     
     # Set device
     if args.device == 'auto':

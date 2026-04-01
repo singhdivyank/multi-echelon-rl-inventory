@@ -85,7 +85,7 @@ class Actor(nn.Module):
             dist = Normal(mean, std)
             z = dist.rsample()
             action = torch.tanh(z)
-            log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
+            log_prob = dist.log_prob(action).sum(dim=-1)  # (batch,) not (batch,1)
         
         # Clip to [-1, 1]
         action = torch.clamp(action, -1.0, 1.0)
@@ -107,8 +107,8 @@ class Actor(nn.Module):
         mean, std = self.forward(state)
         dist = Normal(mean, std)
         
-        log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
-        entropy = dist.entropy().sum(dim=-1, keepdim=True)
+        log_prob = dist.log_prob(action).sum(dim=-1)  # (batch,)
+        entropy = dist.entropy().sum(dim=-1)           # (batch,)
         
         return log_prob, entropy
 
