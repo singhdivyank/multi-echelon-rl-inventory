@@ -201,15 +201,16 @@ class DivergentInventoryEnv(BaseInventoryEnv):
             available = max(0, self.inventory_retailers[i])
             fulfilled = min(demand, available)
             
-            self.inventory_retailers[i] -= demand
-            
             # Backorder unfulfilled demand
+            self.inventory_retailers[i] -= fulfilled
             if demand > fulfilled:
                 self.backorders_retailers[i] += (demand - fulfilled)
                 
             # Clear backorders if we have inventory
             if self.inventory_retailers[i] > 0 and self.backorders_retailers[i] > 0:
-                backorder_fulfillment = min(self.inventory_retailers[i], 
-                                           self.backorders_retailers[i])
+                backorder_fulfillment = min(
+                    self.inventory_retailers[i], 
+                    self.backorders_retailers[i]
+                )
                 self.inventory_retailers[i] -= backorder_fulfillment
                 self.backorders_retailers[i] -= backorder_fulfillment

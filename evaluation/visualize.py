@@ -2,8 +2,6 @@
 Visualization utilities for training and evaluation results
 """
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')  # non-interactive backend — must be set before pyplot import
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Optional
@@ -51,52 +49,96 @@ def plot_training_curves(
     ax = axes[0, 0]
     if len(costs) > 0:
         smoothed_costs = moving_average(costs, window)
-        x_smooth = iterations[:len(smoothed_costs)]
-        cost_std = np.std(costs[:len(smoothed_costs)])
-        ax.plot(
-            x_smooth,
-            smoothed_costs,
-            label='PPO',
-            linewidth=2,
-            color='#2E86AB'
-        )
-        ax.fill_between(
-            x_smooth,
-            smoothed_costs - cost_std,
-            smoothed_costs + cost_std,
-            alpha=0.3, color='#2E86AB'
-        )
+        smoothed_iterations = iterations[:len(smoothed_costs)] if len(iterations) >= len(smoothed_costs) else range(len(smoothed_costs))
+        
+        ax.plot(smoothed_iterations, smoothed_costs, 
+                label='PPO', linewidth=2, color='#2E86AB')
+        
+        # Add confidence band
+        if len(costs) > window:
+            costs_array = np.array(costs)
+            # Calculate rolling std
+            rolling_std = []
+            for i in range(len(smoothed_costs)):
+                start_idx = max(0, i - window // 2)
+                end_idx = min(len(costs), i + window // 2)
+                rolling_std.append(np.std(costs_array[start_idx:end_idx]))
+            
+            rolling_std = np.array(rolling_std)
+            ax.fill_between(smoothed_iterations, 
+                            smoothed_costs - rolling_std,
+                            smoothed_costs + rolling_std,
+                            alpha=0.3, color='#2E86AB')
     
+    # Plot baseline as horizontal line with confidence band
     if baseline_stats and 'episode_costs' in baseline_stats:
-        baseline_costs = baseline_stats['episode_costs']
-        baseline_iterations = baseline_stats.get('iterations', range(len(baseline_costs)))
+        baseline_costs = np.array(baseline_stats['episode_costs'])
         if len(baseline_costs) > 0:
-            smoothed_baseline = moving_average(baseline_costs, window)
-            ax.plot(
-                baseline_iterations[:len(smoothed_baseline)], 
-                smoothed_baseline,
-                label='Baseline', 
-                linewidth=2, 
-                color='#E63946', 
-                linestyle='--'
-            )
+            baseline_mean = np.mean(baseline_costs)
+            baseline_std = np.std(baseline_costs)
+            
+            # Plot mean as dashed line
+            ax.axhline(y=baseline_mean, color='#E63946', linestyle='--', 
+                      linewidth=2, label='Benchmark', zorder=5)
+            
+            # Add confidence band
+            ax.axhspan(baseline_mean - baseline_std, 
+                      baseline_mean + baseline_std,
+                      alpha=0.2, color='#E63946', zorder=1)
     
-    ax.set_xlabel('Iteration (x100)', fontsize=12)
+    ax.set_xlabel('Iteration (×100)', fontsize=12)
     ax.set_ylabel('Cost', fontsize=12)
     ax.set_title('Cost vs Iteration', fontsize=14, fontweight='bold')
-    ax.legend()
+    ax.legend(loc='upper right')
     ax.grid(True, alpha=0.3)
+    
+    # Set reasonable y-axis limits
+    if len(costs) > 0:
+        y_min = min(costs) * 0.8
+        y_max = max(costs[:min(len(costs), 1000)]) * 1.2  # Use early training max
+        ax.set_ylim([y_min, y_max])
     
     # Plot 2: Reward over iterations
     ax = axes[0, 1]
     if len(rewards) > 0:
         smoothed_rewards = moving_average(rewards, window)
-        ax.plot(iterations[:len(smoothed_rewards)], smoothed_rewards,
-                linewidth=2, color='#06A77D')
+        smoothed_iterations = iterations[:len(smoothed_rewards)] if len(iterations) >= len(smoothed_rewards) else range(len(smoothed_rewards))
+        
+        ax.plot(smoothed_iterations, smoothed_rewards,
+                linewidth=2, color='#06A77D', label='PPO')
+        
+        # Add confidence band for rewards
+        if len(rewards) > window:
+            rewards_array = np.array(rewards)
+            rolling_std = []
+            for i in range(len(smoothed_rewards)):
+                start_idx = max(0, i - window // 2)
+                end_idx = min(len(rewards), i + window // 2)
+                rolling_std.append(np.std(rewards_array[start_idx:end_idx]))
+            
+            rolling_std = np.array(rolling_std)
+            ax.fill_between(smoothed_iterations, 
+                            smoothed_rewards - rolling_std,
+                            smoothed_rewards + rolling_std,
+                            alpha=0.3, color='#06A77D')
     
-    ax.set_xlabel('Iteration (x100)', fontsize=12)
+    # Plot baseline reward as horizontal line
+    if baseline_stats and 'episode_rewards' in baseline_stats:
+        baseline_rewards = np.array(baseline_stats['episode_rewards'])
+        if len(baseline_rewards) > 0:
+            baseline_mean = np.mean(baseline_rewards)
+            baseline_std = np.std(baseline_rewards)
+            
+            ax.axhline(y=baseline_mean, color='#E63946', linestyle='--', 
+                      linewidth=2, label='Benchmark', zorder=5)
+            ax.axhspan(baseline_mean - baseline_std, 
+                      baseline_mean + baseline_std,
+                      alpha=0.2, color='#E63946', zorder=1)
+    
+    ax.set_xlabel('Iteration (×100)', fontsize=12)
     ax.set_ylabel('Reward', fontsize=12)
     ax.set_title('Reward vs Iteration', fontsize=14, fontweight='bold')
+    ax.legend(loc='lower right')
     ax.grid(True, alpha=0.3)
     
     # Plot 3: Policy loss (if available)
@@ -109,17 +151,33 @@ def plot_training_curves(
             ax.set_ylabel('Policy Loss', fontsize=12)
             ax.set_title('Policy Loss', fontsize=14, fontweight='bold')
             ax.grid(True, alpha=0.3)
+    else:
+        # If no policy loss data, hide this subplot
+        ax.text(0.5, 0.5, 'No Policy Loss Data', 
+                ha='center', va='center', fontsize=14, transform=ax.transAxes)
+        ax.set_xticks([])
+        ax.set_yticks([])
     
     # Plot 4: Value loss (if available)
     ax = axes[1, 1]
     if 'value_loss' in ppo_stats:
         value_loss = ppo_stats['value_loss']
         if len(value_loss) > 0:
-            ax.plot(value_loss, linewidth=2, color='#9D4EDD')
+            # Clip extreme values for better visualization
+            value_loss_clipped = np.clip(value_loss, 
+                                        np.percentile(value_loss, 1),
+                                        np.percentile(value_loss, 99))
+            ax.plot(value_loss_clipped, linewidth=2, color='#9D4EDD')
             ax.set_xlabel('Update', fontsize=12)
             ax.set_ylabel('Value Loss', fontsize=12)
             ax.set_title('Value Loss', fontsize=14, fontweight='bold')
             ax.grid(True, alpha=0.3)
+    else:
+        # If no value loss data, hide this subplot
+        ax.text(0.5, 0.5, 'No Value Loss Data', 
+                ha='center', va='center', fontsize=14, transform=ax.transAxes)
+        ax.set_xticks([])
+        ax.set_yticks([])
     
     plt.tight_layout()
     
@@ -156,7 +214,7 @@ def plot_comparison(
     agents = ['PPO', 'Benchmark']
     means = [ppo_results['mean_cost'], baseline_results['mean_cost']]
     
-    # Confidence intervals
+    # Confidence intervals (errors from mean)
     ci_lower_ppo = ppo_results['mean_cost'] - ppo_results['ci_lower']
     ci_upper_ppo = ppo_results['ci_upper'] - ppo_results['mean_cost']
     
@@ -194,7 +252,8 @@ def plot_comparison(
     # Add improvement percentage
     improvement = (baseline_results['mean_cost'] - ppo_results['mean_cost']) / baseline_results['mean_cost'] * 100
     ax.text(0.5, max(means) * 0.95, f'Improvement: {improvement:.1f}%',
-            ha='center', fontsize=12, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+            ha='center', fontsize=12, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
+            transform=ax.transAxes)
     
     plt.tight_layout()
     
@@ -229,23 +288,35 @@ def plot_heatmap(
     """
     from evaluation.evaluate import evaluate_policy_heatmap
     
+    # Determine number of retailers
+    num_actions = env.action_space.shape[0]
+    num_retailers = num_actions - 1  # Subtract warehouse action
+    
     # Create figure with subplots
-    num_retailers = env.action_space.shape[0] - 1
-    fig, axes = plt.subplots(1, num_retailers + 1, figsize=(5 * (num_retailers + 1), 4))
+    fig, axes = plt.subplots(1, 1 + num_retailers, figsize=(5 * (num_retailers + 1), 4))
     
     if num_retailers == 0:
+        axes = [axes]
+    elif not isinstance(axes, np.ndarray):
         axes = [axes]
     
     fig.suptitle('Actions of the Warehouse and Retailers', fontsize=16, fontweight='bold')
     
-    # (a) Warehouse heatmap
+    # (a) Warehouse heatmap - vary warehouse inventory and first in-transit
     X, Y, actions = evaluate_policy_heatmap(
-        agent, env, state_indices=(0, 1), num_points=num_points
+        agent, env, state_indices=(0, env.observation_space.shape[0]//2), num_points=num_points
     )
     
     warehouse_actions = actions[:, :, 0]  # First action is warehouse order
     
-    im = axes[0].contourf(X, Y, warehouse_actions, levels=20, cmap='YlOrRd')
+    # Denormalize actions for better interpretation
+    max_order = env.max_orders
+    warehouse_actions_denorm = (warehouse_actions + 1) * max_order / 2
+    
+    im = axes[0].contourf(X * env.max_inventory_warehouse, 
+                          Y * env.max_in_transit, 
+                          warehouse_actions_denorm, 
+                          levels=20, cmap='YlOrRd')
     axes[0].set_xlabel('Inventory Warehouse', fontsize=12)
     axes[0].set_ylabel('In Transit', fontsize=12)
     axes[0].set_title('(a) Warehouse', fontsize=14)
@@ -253,13 +324,23 @@ def plot_heatmap(
     
     # (b) Retailer heatmaps
     for i in range(num_retailers):
+        # Vary retailer inventory and retailer in-transit
+        retailer_inv_idx = 1 + i
+        retailer_transit_idx = 1 + num_retailers + i
+        
         X_r, Y_r, actions_r = evaluate_policy_heatmap(
-            agent, env, state_indices=(1+i, 1+num_retailers+i), num_points=num_points
+            agent, env, 
+            state_indices=(retailer_inv_idx, min(retailer_transit_idx, env.observation_space.shape[0]-1)), 
+            num_points=num_points
         )
         
         retailer_actions = actions_r[:, :, i+1]
+        retailer_actions_denorm = (retailer_actions + 1) * max_order / 2
         
-        im = axes[i+1].contourf(X_r, Y_r, retailer_actions, levels=20, cmap='YlOrRd')
+        im = axes[i+1].contourf(X_r * env.max_inventory_buffer, 
+                                Y_r * env.max_in_transit, 
+                                retailer_actions_denorm, 
+                                levels=20, cmap='YlOrRd')
         axes[i+1].set_xlabel(f'Inventory retailer {i+1}', fontsize=12)
         axes[i+1].set_ylabel('In Transit', fontsize=12)
         axes[i+1].set_title(f'(b) Retailer {i+1}', fontsize=14)
@@ -377,9 +458,14 @@ def plot_convergence_analysis(
     ]
     
     for idx, (metric, title, color) in enumerate(metrics):
-        if metric in training_stats:
+        if metric in training_stats and len(training_stats[metric]) > 0:
             ax = axes[idx // 3, idx % 3]
             data = training_stats[metric]
+            
+            # Clip extreme values for value loss
+            if metric == 'value_loss':
+                data = np.clip(data, np.percentile(data, 1), np.percentile(data, 99))
+            
             ax.plot(data, linewidth=2, color=color)
             ax.set_xlabel('Update', fontsize=12)
             ax.set_ylabel(title, fontsize=12)

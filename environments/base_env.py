@@ -98,12 +98,9 @@ class BaseInventoryEnv(gym.Env):
         
         # Retailer costs
         retailer_holding = np.sum(self.h_r * np.maximum(0, self.inventory_retailers))
-        retailer_backorder = np.sum(self.b_r * np.maximum(0, -self.inventory_retailers))
+        retailer_backorder = np.sum(self.b_r * self.backorders_retailers)
         
-        total_cost = (warehouse_holding + warehouse_backorder + 
-                     retailer_holding + retailer_backorder)
-        
-        return total_cost
+        return warehouse_holding + warehouse_backorder + retailer_holding + retailer_backorder
         
     def _generate_demand(self) -> Tuple[float, np.ndarray]:
         """Generate stochastic demand for warehouse and retailers"""
@@ -115,8 +112,10 @@ class BaseInventoryEnv(gym.Env):
             
         # Retailer demands
         if isinstance(self.lambda_w_r, (int, float)):
-            retailer_demands = np.random.poisson(self.lambda_w_r, 
-                                                 size=len(self.inventory_retailers))
+            retailer_demands = np.random.poisson(
+                self.lambda_w_r, 
+                size=len(self.inventory_retailers)
+            )
         else:
             retailer_demands = np.full(len(self.inventory_retailers), self.lambda_w_r)
             
@@ -124,7 +123,7 @@ class BaseInventoryEnv(gym.Env):
         
     def _generate_lead_time(self) -> int:
         """Generate stochastic lead time"""
-        return self.lead_time_dist()
+        return 1
         
     def _normalize_state(self, state: np.ndarray) -> np.ndarray:
         """Normalize state to [-1, 1] range"""
@@ -194,7 +193,7 @@ class BaseInventoryEnv(gym.Env):
         
         # Compute cost and reward
         cost = self._compute_cost()
-        reward = -cost  # Minimize cost = maximize negative cost
+        reward = -cost/1000  # Minimize cost = maximize negative cost
         
         self.episode_costs.append(cost)
         self.current_step += 1
