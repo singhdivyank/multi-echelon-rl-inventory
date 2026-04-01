@@ -42,10 +42,10 @@ def load_config(config_path: str = None) -> dict:
         'agent': {
             'hidden_size': 64,
             'n_layers': 3,
-            'lr': 1e-4,
+            'lr': 1e-5,
             'gamma': 0.99,
             'gae_lambda': 0.95,
-            'entropy_coef': 0.01,
+            'entropy_coef': 0.02,
             'value_loss_coef': 0.5,
             'max_grad_norm': 0.5,
             'device': 'auto',
@@ -178,6 +178,7 @@ def main(args):
     print("\n--- Evaluating Policies ---")
     
     print("Evaluating A3C agent...")
+    agent.load("./results/checkpoints/best_model.pt")
     rl_metrics = evaluate_agent(
         env,
         agent,

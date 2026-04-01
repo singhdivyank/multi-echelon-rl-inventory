@@ -109,6 +109,9 @@ class Trainer:
         
         # Recent episodes for moving average
         recent_rewards = deque(maxlen=100)
+        best_cost = float('inf')
+        best_episode = 0
+
         # Pre-fill from restored history
         for r in self.training_history['episode_rewards'][-100:]:
             recent_rewards.append(r)
@@ -155,14 +158,28 @@ class Trainer:
                 self.training_history['eval_costs'].append(eval_metrics['mean_cost'])
                 self.training_history['eval_service_levels'].append(eval_metrics['mean_service_level'])
                 
+                current_cost = eval_metrics['mean_cost']
+                
                 print(f"\nEvaluation at episode {episode + 1}:")
                 print(f"  Mean reward: {eval_metrics['mean_reward']:.2f} ± {eval_metrics['std_reward']:.2f}")
                 print(f"  Mean cost: {eval_metrics['mean_cost']:.2f} ± {eval_metrics['std_cost']:.2f}")
                 print(f"  Service level: {eval_metrics['mean_service_level']:.2%}")
             
-            # Save checkpoint
-            if (episode + 1) % self.save_frequency == 0:
-                self._save_checkpoint(episode + 1)
+                # Save checkpoint
+                if current_cost < best_cost:
+                    best_cost = current_cost
+                    best_episode = episode + 1
+
+                    best_path = os.path.join(self.save_dir, "best_model.pt")
+
+                    torch.save({
+                        'network_state_dict': self.agent.network.state_dict(),
+                        'optimizer_state_dict': self.agent.optimizer.state_dict(),
+                        'episode': best_episode,
+                        'best_cost': best_cost
+                    }, best_path)
+
+                    print(f"BEST model saved at episode {best_episode} with cost {best_cost:.2f}")
         
         # Final save
         self._save_checkpoint(self.n_episodes, final=True)
@@ -315,7 +332,6 @@ class Trainer:
             'optimizer_state_dict': self.agent.optimizer.state_dict(),
             'episode': episode,
             'total_steps': self.total_steps,
-            'training_history': self.training_history,
         }
         torch.save(checkpoint, checkpoint_path)
         print(f"\nCheckpoint saved: {checkpoint_path} (episode {episode})")
@@ -354,7 +370,7 @@ class Trainer:
         Returns:
             The episode number to resume from.
         """
-        checkpoint = torch.load(path, map_location=self.agent.device)
+        checkpoint = torch.load(path, map_location=self.agent.device, weights_only=False)
         
         # Restore model + optimizer
         self.agent.network.load_state_dict(checkpoint['network_state_dict'])

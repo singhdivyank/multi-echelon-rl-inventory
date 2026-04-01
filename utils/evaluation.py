@@ -67,10 +67,11 @@ def evaluate_agent(
             service_level_sum += info['service_level']
             
             # Accumulate cost breakdown
-            for cost_type in ['shortage', 'holding', 'reordering']:
+            for cost_type in ['shortage', 'holding']:
                 for wh in info['cost_breakdown'][cost_type]:
                     episode_breakdown[cost_type] += info['cost_breakdown'][cost_type][wh]
             
+            episode_breakdown['reordering'] += info['cost_breakdown']['reordering']
             steps += 1
         
         episode_rewards.append(episode_reward)
@@ -151,10 +152,11 @@ def evaluate_baseline(
             service_level_sum += info['service_level']
             
             # Accumulate cost breakdown
-            for cost_type in ['shortage', 'holding', 'reordering']:
+            for cost_type in ['shortage', 'holding']:
                 for wh in info['cost_breakdown'][cost_type]:
                     episode_breakdown[cost_type] += info['cost_breakdown'][cost_type][wh]
             
+            episode_breakdown['reordering'] += info['cost_breakdown']['reordering']
             steps += 1
         
         episode_rewards.append(episode_reward)

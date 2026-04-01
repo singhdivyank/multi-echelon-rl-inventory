@@ -100,8 +100,8 @@ class MEISEnv(gym.Env):
                 'price_per_product': 50,
                 'min_reorder_cost': 1000,
                 'reorder_cost_constant': 0,
-                'shortage_cost_constant': 0,  # No shortage cost at middle
-                'holding_cost_constant': 0.1,
+                'shortage_cost_constant': 5,
+                'holding_cost_constant': 0.3,
                 'reorder_qty_options': [5000, 10000, 15000, 20000],
             },
             'leaf_warehouse': {
@@ -114,7 +114,7 @@ class MEISEnv(gym.Env):
                 'min_reorder_cost': 5000,
                 'reorder_cost_constant': 0.5,
                 'shortage_cost_constant': 10,
-                'holding_cost_constant': 0.1,
+                'holding_cost_constant': 0.5,
                 'max_backlog_duration': 7,
                 'reorder_qty_options': [3000, 6000, 9000, 12000],
             }
@@ -152,6 +152,7 @@ class MEISEnv(gym.Env):
     def reset(self) -> np.ndarray:
         """Reset the environment to initial state"""
         self.current_step = 0
+        self.last_reorder_cost = 0
         self.total_cost_history = []
         
         # Initialize inventory on hand
@@ -218,6 +219,9 @@ class MEISEnv(gym.Env):
             done: Whether episode is finished
             info: Additional information
         """
+
+        self.last_reorder_cost = 0
+
         # Process action (place orders)
         self._process_action(action)
         
@@ -236,7 +240,7 @@ class MEISEnv(gym.Env):
         self.total_cost_history.append(total_cost)
         
         # Reward is negative cost (minimization -> maximization)
-        reward = -total_cost
+        reward = -total_cost /1e6
         
         # Update step counter
         self.current_step += 1
@@ -290,6 +294,11 @@ class MEISEnv(gym.Env):
         """
         # Sample lead time
         config = self.warehouse_config[warehouse]
+        reorder_cost = max(
+            config['min_reorder_cost'],
+            config['reorder_cost_constant'] * quantity
+        )
+        self.last_reorder_cost += reorder_cost
         lead_time = max(1, int(self.np_random.normal(
             config['lead_time_mean'],
             config['lead_time_std']
@@ -395,57 +404,58 @@ class MEISEnv(gym.Env):
     def _calculate_costs(self) -> Dict:
         """
         Calculate costs for all warehouses
-        
-        Returns breakdown of shortage, reordering, and holding costs
+
+        Returns breakdown of shortage, holding, and reordering costs
         """
         cost_breakdown = {
             'shortage': {},
-            'reordering': {},
             'holding': {},
+            'reordering': 0,
             'total': 0
         }
-        
+
+        total_shortage_cost = 0
+        total_holding_cost = 0
+
+        # --- Shortage + Holding Costs ---
         for warehouse in ['middle', 'leaf_1', 'leaf_2']:
             config = self.warehouse_config[warehouse]
-            
-            # Shortage cost (only for leaf warehouses, based on backlog)
+
+            # --- Shortage Cost (only leaf warehouses) ---
             shortage_cost = 0
             if warehouse in ['leaf_1', 'leaf_2']:
-                for backlog_item in self.backlog[warehouse]:
-                    quantity, age = backlog_item
-                    # Shortage cost increases with age
+                for quantity, age in self.backlog[warehouse]:
                     shortage_cost += (
-                        config['shortage_cost_constant'] * 
-                        quantity * 
-                        config['price_per_product'] *
-                        (age + 1)  # Weight by age
+                        config['shortage_cost_constant']
+                        * quantity
+                        * config['price_per_product']
                     )
-            
+
             cost_breakdown['shortage'][warehouse] = shortage_cost
-            
-            # Holding cost (positive inventory)
+            total_shortage_cost += shortage_cost
+
+            # --- Holding Cost ---
             holding_cost = (
-                config['holding_cost_constant'] * 
-                max(0, self.ioh[warehouse]) * 
+                config['holding_cost_constant'] *
+                max(0, self.ioh[warehouse]) *
                 config['price_per_product']
             )
             cost_breakdown['holding'][warehouse] = holding_cost
-            
-            # Reordering cost (for orders placed this step)
-            # This is calculated based on action, but we approximate here
-            reordering_cost = 0
-            # We count reordering cost for any new orders in the queue
-            # (This is a simplification; in practice, track orders placed this step)
-            
-            cost_breakdown['reordering'][warehouse] = reordering_cost
-        
-        # Calculate total
-        cost_breakdown['total'] = (
-            sum(cost_breakdown['shortage'].values()) +
-            sum(cost_breakdown['reordering'].values()) +
-            sum(cost_breakdown['holding'].values())
-        )
-        
+            total_holding_cost += holding_cost
+
+        # --- Reordering Cost (ONLY ONCE per step) ---
+        total_reordering_cost = self.last_reorder_cost
+
+        cost_breakdown['reordering'] = total_reordering_cost
+
+        # --- Total Cost ---
+        total_cost = total_shortage_cost + total_holding_cost + total_reordering_cost
+
+        # Optional normalization (RECOMMENDED for stability)
+        total_cost = total_cost
+
+        cost_breakdown['total'] = total_cost
+
         return cost_breakdown
     
     def _calculate_service_level(self) -> float:

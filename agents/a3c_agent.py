@@ -160,16 +160,17 @@ class A3CAgent:
         action_dim: int,
         hidden_size: int = 64,
         n_layers: int = 3,
-        lr: float = 1e-4,
+        lr: float = 1e-5,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
-        entropy_coef: float = 0.01,
+        entropy_coef: float = 0.02,
         value_loss_coef: float = 0.5,
         max_grad_norm: float = 0.5,
         device: str = 'cpu'
     ):
         self.device = self._get_device(device)
-        
+        self.action_dim = action_dim
+
         # Hyperparameters
         self.gamma = gamma
         self.gae_lambda = gae_lambda
@@ -233,14 +234,20 @@ class A3CAgent:
             log_prob: Log probability of action
             value: State value estimate
         """
+        state = state / 10000
         state_tensor = torch.FloatTensor(state).to(self.device)
+
+        if not deterministic and np.random.rand() < 0.02:
+            action = np.random.randint(self.action_dim)
+
+            with torch.no_grad():
+                _, value = self.network.forward(state_tensor)
+        
+            return action, 0.0, value.item()
         
         with torch.no_grad():
-            action, log_prob, value = self.network.get_action(
-                state_tensor,
-                deterministic
-            )
-        
+            action, log_prob, value = self.network.get_action(state_tensor, deterministic)
+
         return action, log_prob.item(), value.item()
     
     def compute_gae(
@@ -302,7 +309,7 @@ class A3CAgent:
             Dictionary of training metrics
         """
         # Convert to tensors
-        states_tensor = torch.FloatTensor(np.array(states)).to(self.device)
+        states_tensor = torch.FloatTensor(np.array(states)/10000.0).to(self.device)
         actions_tensor = torch.LongTensor(actions).to(self.device)
         advantages_tensor = torch.FloatTensor(advantages).to(self.device)
         returns_tensor = torch.FloatTensor(returns).to(self.device)
@@ -362,7 +369,7 @@ class A3CAgent:
     
     def load(self, path: str):
         """Load model checkpoint"""
-        checkpoint = torch.load(path, map_location=self.device)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
         self.network.load_state_dict(checkpoint['network_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
@@ -394,7 +401,7 @@ def create_agent(config: Dict, state_dim: int, action_dim: int) -> A3CAgent:
         action_dim=action_dim,
         hidden_size=agent_config.get('hidden_size', 64),
         n_layers=agent_config.get('n_layers', 3),
-        lr=agent_config.get('lr', 1e-4),
+        lr=agent_config.get('lr', 1e-5),
         gamma=agent_config.get('gamma', 0.99),
         gae_lambda=agent_config.get('gae_lambda', 0.95),
         entropy_coef=agent_config.get('entropy_coef', 0.01),

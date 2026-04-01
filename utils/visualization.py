@@ -13,9 +13,12 @@ Author: AI/ML Engineering Team
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import os
 
+
+def moving_average(data, window=100):
+    return np.convolve(data, np.ones(window)/window, mode='valid')
 
 def set_plot_style():
     """Set consistent plot style"""
@@ -433,6 +436,53 @@ def plot_cost_per_period(
     else:
         plt.close()
 
+def plot_training_curve(
+    training_history: Dict, 
+    save_path: str
+):
+    rewards = np.array(training_history['episode_rewards'])
+
+    # Smooth rewards
+    smoothed = moving_average(rewards, window=100)
+
+    # Std deviation (rolling)
+    stds = []
+    window = 100
+    for i in range(len(smoothed)):
+        stds.append(np.std(rewards[i:i+window]))
+    stds = np.array(stds)
+
+    episodes = np.arange(len(smoothed))
+
+    # Best so far
+    best = np.maximum.accumulate(smoothed)
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(episodes, smoothed, label='Training Scores', color='blue')
+    plt.fill_between(
+        episodes,
+        smoothed - stds,
+        smoothed + stds,
+        color='blue',
+        alpha=0.2
+    )
+
+    plt.plot(episodes, best, label='Best Result', color='orange')
+
+    plt.xlabel('Episodes')
+    plt.ylabel('Score [CHF]')
+    plt.title('RL Training Performance')
+
+    plt.legend()
+    plt.grid(True)
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    plt.show()
+
 
 def create_all_plots(
     env,
@@ -492,6 +542,11 @@ def create_all_plots(
         baseline_policy,
         save_path=os.path.join(save_dir, 'cost_per_period.png'),
         show=show
+    )
+
+    plot_training_curve(
+        training_history=training_history,
+        save_path=os.path.join(save_dir, 'training_results.png')
     )
     
     print(f"All plots saved to: {save_dir}")
