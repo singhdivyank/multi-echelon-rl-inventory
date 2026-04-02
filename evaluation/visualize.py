@@ -251,7 +251,7 @@ def plot_comparison(
     
     # Add improvement percentage
     improvement = (baseline_results['mean_cost'] - ppo_results['mean_cost']) / baseline_results['mean_cost'] * 100
-    ax.text(0.5, max(means) * 0.95, f'Improvement: {improvement:.1f}%',
+    ax.text(0.5, 0.95, f'Improvement: {improvement:.1f}%',
             ha='center', fontsize=12, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
             transform=ax.transAxes)
     
