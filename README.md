@@ -1,1 +1,19 @@
 # multi-echelon-rl-inventory
+
+(s,S) Baseline:
+  Mean Cost: 1962.40 ± 52.39
+  Mean Service Level: 95.44% ± 0.20%
+  Cost Breakdown:
+    Shortage: 18160470.44
+    Holding: 163967.32
+    Reordering: 1237604.00
+
+--- Comparison Results ---
+
+Improvement:
+  Cost: 1.51%
+  Service Level: 0.19%
+  Statistical Significance (cost): True (p=0.0000)
+  Effect Size (Cohen's d): 0.742
+
+> "The RL agent achieves a modest but statistically significant improvement (~1.5%) over the (s,S) policy, which is already near-optimal. This demonstrates the ability of reinforcement learning to fine-tune inventory decisions beyond classical heuristics, particularly in stochastic environments."
