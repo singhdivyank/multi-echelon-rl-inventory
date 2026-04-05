@@ -1,0 +1,35 @@
+environment:
+  max_steps_per_episode: 365
+
+agent:
+  hidden_size: 64
+  n_layers: 3
+  lr: 0.0001
+  gamma: 0.99
+  gae_lambda: 0.95
+  entropy_coef: 0.001
+  value_loss_coef: 0.5
+  max_grad_norm: 0.5
+  device: 'auto'
+
+training:
+  n_episodes: 10000
+  max_steps_per_episode: 365
+  update_frequency: 1
+  eval_frequency: 1000
+  n_eval_episodes: 100
+  save_frequency: 1000
+
+baseline:
+  # MUST be tuned
+  # tune: true
+  tuning_episodes: 30
+  tuning_maxiter: 100
+
+evaluation:
+  n_episodes: 1000
+  deterministic: true
+
+general:
+  seed: 42
+  save_dir: './results'

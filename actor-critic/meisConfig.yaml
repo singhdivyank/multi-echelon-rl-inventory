@@ -1,0 +1,41 @@
+max_steps_per_episode: 365
+
+factory:
+  ioh_initial: .inf
+  lead_time_mean: 0
+  lead_time_std: 0
+  price_per_product: 0
+  min_reorder_cost: 0
+  reorder_cost_constant: 0
+  shortage_cost_constant: 0
+  holding_cost_constant: 0
+
+middle:
+  ioh_initial: 10000
+  lead_time_mean: 2
+  lead_time_std: 1
+  price_per_product: 50
+  min_reorder_cost: 1000
+  reorder_cost_constant: 0
+  shortage_cost_constant: 1
+  holding_cost_constant: 0.03
+  reorder_qty_options: [5000, 10000, 15000, 20000]
+
+leaf:
+  ioh_initial: 5000
+  demand_mean: 3300
+  demand_std: 100
+  lead_time_mean: 2
+  lead_time_std: 1
+  price_per_product: 100
+  min_reorder_cost: 5000
+  reorder_cost_constant: 0.5
+  shortage_cost_constant: 2
+  holding_cost_constant: 0.05
+  max_backlog_duration: 7
+  reorder_qty_options: [3000, 6000, 9000, 12000]
+
+env:
+  n_warehouses: 3
+  state_dim_per_warehouse: 4
+  total_state_dim: 12
