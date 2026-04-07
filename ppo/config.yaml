@@ -1,0 +1,68 @@
+ppo:
+  # training parameters
+  iterations: 1000
+  # network architecture
+  hidden_layers: [64, 64]
+  activation: tanh
+  weight_init: glorot_uniform
+  # PPO specific
+  # buffer_size: 256
+  buffer_size: 512
+  batch_size: 64
+  update_epochs: 5
+  # learning_rate: 1e-4
+  learning_rate: 3e-4
+  gamma: 0.95
+  gae_lambda: 0.95
+  epsilon: 0.2
+  # optimization
+  normalize_advantages: True
+  clip_grad_norm: True
+  max_grad_norm: 0.5
+  value_loss_coef: 0.25
+  entropy_coef: 0.005
+  # logging
+  log_interval: 100
+  save_interval: 1000
+  eval_interval: 500
+  eval_episodes: 100
+  # Reproducibility
+  seed: 42
+
+divergent:
+  structure: divergent
+  # Demand Parameters
+  lambda_w: 1
+  # lambda_w_r: 1
+  lambda_w_r: 10
+  d_i: Pois(Unif[5,15])
+  # Network Structure
+  K: 4
+  num_retailers: 3
+  # Cost Parameters
+  h_w: 1 # Warehouse holding cost
+  h_r: 1 # Retailer holding cost
+  b_w: 0 # Warehouse backorder cost
+  b_r: 19 # Retailer backorder cost
+  # State Space Upper Bounds
+  max_inventory_warehouse: 1000
+  max_inventory_buffer: 450
+  max_in_transit_w_r: 250
+  # max_in_transit_r_r: 250
+  # max_backorder_r_w: 150
+  max_backorder_r: 150
+  max_outstanding_w: 300
+  # max_outstanding_r: 75
+  max_orders_w: 30
+  # max_orders_r_w: 75
+  # Episode parameters
+  # max_steps: 1000
+  max_steps: 500
+  warmup_steps: 100
+  it: 1000
+  ib: 450
+
+general:
+  seed: 42
+  save_dir: './results'
+  device: 'auto'
