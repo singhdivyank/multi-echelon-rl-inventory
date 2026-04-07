@@ -182,6 +182,7 @@ class A3CAgent:
                 _ = torch.zeros(1, device='cuda')
                 print("Using CUDA device")
                 self.device = torch.device("cuda")
+                return 
             except RuntimeError:
                 print("CUDA report available but failed - alling back to CPU")
             
