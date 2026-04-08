@@ -11,8 +11,10 @@ from typing import Dict
 from ruamel.yaml import YAML
 
 from evaluation.evaluate import eval_agents
+from evaluation.visualise import plot_comparison, plot_heatmap
 from utils.helpers import (
     create_directories, 
+    read_eval_results,
     save_eval_results,
     save_stats,
     set_seeds, 
@@ -56,15 +58,31 @@ def main(args):
         )
         stats_path = os.path.join(save_dir, 'training_stats.json')
         save_stats(stats=training_stats, save_path=stats_path)
-    else:
+    elif args.mode == 'eval':
         eval_results = eval_agents(
-            config=config, 
+            config=ppo_config, 
             env_config=env_config, 
-            checkpoint_path=dirs[0],
-            plots_path=dirs[-1]
+            checkpoint_path=dirs[1],
+            device_name=device_name
         )
         eval_path = os.path.join(save_dir, 'evaluation_results.json')
         save_eval_results(results=eval_results, save_path=eval_path)
+    else:
+        eval_path = os.path.join(save_dir, 'evaluation_results.json')
+        eval_results = read_eval_results(eval_path)
+        
+        print("\nGenerating comparison plots...")
+        comparison_path = os.path.join(dirs[-1], 'comparison.png')
+
+        ppo_results = eval_results['ppo']
+        baseline_results = eval_results['baseline']
+        plot_comparison(ppo_results, baseline_results, save_path=comparison_path)
+        
+        print("\nGenerating policy heatmaps...")
+        heatmap_path = os.path.join(dirs[-1], 'heatmap.png')
+        plot_heatmap(ppo_agent, env, save_path=heatmap_path)
+        
+        print(f"Heatmap saved to {heatmap_path}")
     
     print("\n" + "="*80)
     print("Experiment Complete!")
@@ -78,8 +96,8 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         default='train',
-        choices=['train', 'eval'],
-        help='Mode: train or eval'
+        choices=['train', 'eval', 'plot'],
+        help='Mode: train, eval, or plot'
     )
     args = parser.parse_args()
     main(args)

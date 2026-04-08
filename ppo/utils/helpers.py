@@ -67,3 +67,11 @@ def save_eval_results(results: Dict, save_path: str):
         json.dump(results, f, indent=2, default=convert)
     
     print(f"Evaluation results saved to {save_path}")
+
+def read_eval_results(save_path: str) -> Dict:
+    """Return agent evaluation stats"""
+
+    with open(save_path, 'r') as f:
+        eval_results = json.load(f)
+    
+    return eval_results

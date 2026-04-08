@@ -4,7 +4,33 @@ Utility functions for computing metrics and advantages
 
 from typing import Tuple
 
+import numpy as np
 import torch
+
+def compute_confidence_interval(
+    data: np.ndarray, 
+    confidence: float = 0.95
+) -> Tuple[float, float, float]:
+    """
+    Compute mean and confidence interval
+    
+    Args:
+        data: Array of data points
+        confidence: Confidence level (default 0.95 for 95% CI)
+        
+    Returns:
+        mean: Mean of data
+        lower: Lower bound of CI
+        upper: Upper bound of CI
+    """
+
+    from scipy import stats
+
+    mean = np.mean(data)
+    sem = stats.sem(data)
+    ci = sem * stats.t.ppf((1 + confidence) / 2, len(data) - 1)
+    lower_bound, upper_bound = mean - ci, mean + ci
+    return mean, lower_bound, upper_bound
 
 def compute_gae(
     rewards: torch.Tensor,

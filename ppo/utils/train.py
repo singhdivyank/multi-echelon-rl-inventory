@@ -188,7 +188,7 @@ def train_agents(
 
     # Create Logger
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = os.path.join(save_dirs[1], f'divergent_{timestamp}')
+    log_dir = os.path.join(save_dirs[2], f'divergent_{timestamp}')
     logger = Logger(log_dir)
 
     # Train PPO agent
