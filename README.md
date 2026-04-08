@@ -26,4 +26,4 @@ Improvement:
 
 ## PPO
 
-> "PPO rapidly learns an optimal inventory policy within ~150 episodes and maintains it, with minor fluctuations due to stochastic exploration"
+> "PPO rapidly learns an optimal inventory policy within ~150 episodes and maintains it, with minor fluctuations due to stochastic exploration. PPO reduces cost by 33% compared to (s, S) baseline."

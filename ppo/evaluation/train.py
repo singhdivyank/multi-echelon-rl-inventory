@@ -6,11 +6,11 @@ from tqdm import tqdm
 
 import numpy as np
 
-from .logger import Logger
-from evaluation.visualise import plot_training_curves
+from .visualise import plot_training_curves
 from models.baseline import BaselineAgent
 from models.env import DivergentInventoryEnv
 from models.ppo import PPOAgent
+from utils.logger import Logger
 
 def train_ppo(
     agent, 

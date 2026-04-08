@@ -107,21 +107,6 @@ class BaseInventoryEnv(gym.Env):
 
         cost = warehouse_holding + warehouse_backorder + retailer_holding + retailer_backorder
         return cost
-    
-    # def _generate_demand(self) -> Tuple[float, np.ndarray]:
-    #     """Generate stochastic demand for warehouse and retailers"""
-
-    #     if isinstance(self.lambda_w, (int, float)):
-    #         warehouse_demand = np.random.poisson(self.lambda_w)
-    #         retailer_demands = np.random.poisson(
-    #             self.lambda_w_r,
-    #             size=len(self.inventory_retailers)
-    #         )
-    #         return warehouse_demand, retailer_demands
-        
-    #     warehouse_demand = self.lambda_w
-    #     retailer_demands = np.full(len(self.inventory_retailers), self.lambda_w_r)
-    #     return warehouse_demand, retailer_demands
 
     def _generate_demand(self):
         """Demand: Poisson(Uniform[5,15])"""
