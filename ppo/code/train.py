@@ -6,7 +6,6 @@ from tqdm import tqdm
 
 import numpy as np
 
-from .visualise import plot_training_curves
 from models.baseline import BaselineAgent
 from models.env import DivergentInventoryEnv
 from models.ppo import PPOAgent
@@ -40,7 +39,7 @@ def train_ppo(
         Training statistics
     """
 
-    from evaluation.evaluate import evaluate_policy
+    from code.evaluate import evaluate_policy
 
     print(f"\nStarting PPO training for {num_iterations} iterations...")
     stats = {
@@ -173,7 +172,7 @@ def train_agents(
 ) -> Dict:
     """Train PPO and Baseline agents"""
 
-    from evaluation.evaluate import evaluate_baseline
+    from code.evaluate import evaluate_baseline
 
     print("="*80)
     print("Training Divergent Inventory Optimization")
@@ -230,11 +229,6 @@ def train_agents(
     )
     baseline_save_path = os.path.join(save_dirs[0], 'baseline_divergent.npy')
     baseline_agent.save(baseline_save_path)
-
-    print("\nGenerating training plots...")
-    plot_path = os.path.join(save_dirs[-1], 'training_curves.png')
-    plot_training_curves()
-    print(f"Training curves saved to {plot_path}")
 
     # Generate stats
     stats = {

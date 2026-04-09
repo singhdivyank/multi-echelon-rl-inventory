@@ -4,7 +4,14 @@ from typing import Dict, List
 
 import numpy as np
 import torch
+from ruamel.yaml import YAML
 
+def load_config() -> Dict:
+    """Load configurations from YAML file"""
+
+    with open('config.yaml', 'r') as f:
+        config = YAML().load(f)
+        return config
 
 def set_seeds(seed: int):
     """Set random seeds for reproducibility"""
@@ -68,10 +75,10 @@ def save_eval_results(results: Dict, save_path: str):
     
     print(f"Evaluation results saved to {save_path}")
 
-def read_eval_results(save_path: str) -> Dict:
+def read_results(save_path: str) -> Dict:
     """Return agent evaluation stats"""
 
     with open(save_path, 'r') as f:
-        eval_results = json.load(f)
+        data = json.load(f)
     
-    return eval_results
+    return data

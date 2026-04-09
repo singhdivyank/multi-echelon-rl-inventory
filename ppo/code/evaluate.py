@@ -6,7 +6,6 @@ from tqdm import tqdm
 
 from models.baseline import BaselineAgent
 from models.env import DivergentInventoryEnv
-from evaluation.visualise import plot_comparison, plot_heatmap
 from utils.logger import Logger
 from utils.metrics import compute_confidence_interval
 

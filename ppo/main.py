@@ -6,16 +6,14 @@ Trains both PPO and Baseline agents and compares performance.
 import argparse
 import os
 import sys
-from typing import Dict
 
-from ruamel.yaml import YAML
-
-from evaluation.evaluate import eval_agents
-from evaluation.visualise import plot_comparison, plot_heatmap
-from evaluation.train import train_agents
+from code.evaluate import eval_agents
+from code.visualise import plot_comparison, plot_training_curves
+from code.train import train_agents
 from utils.helpers import (
     create_directories, 
-    read_eval_results,
+    load_config,
+    read_results,
     save_eval_results,
     save_stats,
     set_seeds, 
@@ -25,16 +23,8 @@ from utils.helpers import (
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _load_config() -> Dict:
-    """Load configurations from YAML file"""
-
-    with open('config.yaml', 'r') as f:
-        config = YAML().load(f)
-        return config
-
-
 def main(args):
-    config = _load_config()
+    config = load_config()
     ppo_config = dict(config['ppo'])
 
     seed_val = ppo_config['seed']
@@ -69,21 +59,27 @@ def main(args):
         save_eval_results(results=eval_results, save_path=eval_path)
     else:
         eval_path = os.path.join(save_dir, 'evaluation_results.json')
+        train_stats_path = os.path.join(save_dir, 'training_stats.json')
+        plot_path = os.path.join(dirs[-1], 'training_curves.png')
         comparison_path = os.path.join(dirs[-1], 'comparison.png')
-        heatmap_path = os.path.join(dirs[-1], 'heatmap.png')
+
+        print("\nGenerating training plots...")
+        train_results = read_results(train_stats_path)
+        plot_training_curves(
+            ppo_stats=train_results['ppo'], 
+            baseline_stats=train_results['baseline'], 
+            save_path=plot_path
+        )
+        print(f"Training curves saved to {plot_path}")
 
         print("\nGenerating comparison plots...")
-        eval_results = read_eval_results(eval_path)
+        eval_results = read_results(eval_path)
         plot_comparison(
             ppo_results=eval_results['ppo'], 
             baseline_results=eval_results['baseline'], 
             save_path=comparison_path
         )
-        
-        print("\nGenerating policy heatmaps...")
-        plot_heatmap(ppo_agent, env, save_path=heatmap_path)
-        
-        print(f"Heatmap saved to {heatmap_path}")
+        print(f"Comparison plots saved to {eval_results}")
     
     print("\n" + "="*80)
     print("Experiment Complete!")

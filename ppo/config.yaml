@@ -6,11 +6,9 @@ ppo:
   activation: tanh
   weight_init: glorot_uniform
   # PPO specific
-  # buffer_size: 256
   buffer_size: 512
   batch_size: 64
   update_epochs: 5
-  # learning_rate: 1e-4
   learning_rate: 3e-4
   gamma: 0.95
   gae_lambda: 0.95
@@ -33,30 +31,28 @@ divergent:
   structure: divergent
   # Demand Parameters
   lambda_w: 1
-  # lambda_w_r: 1
   lambda_w_r: 10
   d_i: Pois(Unif[5,15])
   # Network Structure
   K: 4
   num_retailers: 3
   # Cost Parameters
-  h_w: 1 # Warehouse holding cost
-  h_r: 1 # Retailer holding cost
-  b_w: 0 # Warehouse backorder cost
-  b_r: 19 # Retailer backorder cost
+  # Warehouse holding cost
+  h_w: 1
+  # Retailer holding cost
+  h_r: 1
+  # Warehouse backorder cost
+  b_w: 0
+  # Retailer backorder cost
+  b_r: 19
   # State Space Upper Bounds
   max_inventory_warehouse: 1000
   max_inventory_buffer: 450
   max_in_transit_w_r: 250
-  # max_in_transit_r_r: 250
-  # max_backorder_r_w: 150
   max_backorder_r: 150
   max_outstanding_w: 300
-  # max_outstanding_r: 75
   max_orders_w: 30
-  # max_orders_r_w: 75
   # Episode parameters
-  # max_steps: 1000
   max_steps: 500
   warmup_steps: 100
   it: 1000
