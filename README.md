@@ -1,6 +1,6 @@
 # Deep Reinforcement Learning for Multi-Echelon Inventory Optimization
 
-![](https://www.mdpi.com/processes/processes-11-00796/article_deploy/html/images/processes-11-00796-g001.png)
+![](./problem_description.png)
 
 Inventory Optimization is a critical problem in supply chain systems, where traditional heuristics such as [(s, S)](https://hub.spreadsheetweb.com/templates/view/s-s-inventory-model#:~:text=The%20s%2DS%20inventory%20policy%20analysis,stockouts%20and%20minimizing%20inventory%20expenses) policies struggle under stochastic demand, lead time variability, and multi-echelon dependencies.
 
@@ -17,6 +17,7 @@ We model the system as a **Markov Decision Process (MDP)**:
 ### Objective
 
 Minimize expected cumulative cost: 
+
 $$
 
 J(\pi) = \mathbb{E} \left[ \sum_{t=0}^{T} \gamma^t C(s_t, a_t) \right]
