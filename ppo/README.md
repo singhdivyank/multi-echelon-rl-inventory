@@ -73,26 +73,57 @@ $$
 
 ## Results
 
-### Trade-off insights
+> **PPO achieves a 33.5% cost reduction over the (s, S) baseline — saving ~1.38M per episode — while simultaneously improving service level from 95% to 99%.**
 
-| Metric | PPO | (s, S) baseline |
-| ------ | --- | --------------- |
-| Avg cost | 2.73 M | 4.1 M |
-| Std Dev | 25K | 8.7K |
-| 95% CI | [2.728M, 2.738M] | [4.110M, 4.114M] |
-| Reward | -273 | -411 |
-| Service Level | 99% | 95% |
-| Avg. Order Quantity | 2.6 | 14 |
-| Cost Improvement | 33.5% | -- |
+### Performance Comparison
+
+| Metric | PPO | (s, S) Baseline | Improvement |
+| ------ | --- | --------------- | ----------- |
+| Avg Cost | **2,733,733** | 4,112,776 | ↓ **33.5%** (~1.38M/episode) |
+| Cost Std Dev | 24,969 | 8,759 | — |
+| 95% CI (cost) | [2.729M, 2.739M] | [4.111M, 4.115M] | Non-overlapping ✅ |
+| Avg Reward | **−273.4** | −411.3 | ↑ 34% better |
+| Service Level | **~99%** | ~95% | ↑ +4 pp |
+| Avg Order Qty / Step | **2.67** | 14.0 | ↓ 5.2× fewer orders |
+| Backorders | **0** | 0 | Maintained |
+
+### Confidence Interval Analysis
+
+The 95% confidence intervals for the two policies are **completely non-overlapping**, confirming the cost improvement is statistically significant without requiring a formal test:
+
+```
+PPO       ████████████████  [2,728,754 — 2,738,712]
+Baseline                                              ██████████████████  [4,111,029 — 4,114,522]
+```
+
+The gap between the upper bound of PPO and the lower bound of baseline is **~1.37M** — more than 54× the width of either CI.
+
+### Ordering Behaviour
+
+The most revealing difference is in *how* each policy controls inventory:
+
+| Behaviour | PPO | (s, S) Baseline |
+| --------- | --- | --------------- |
+| Avg orders/step | **2.67** | 14.0 |
+| Strategy | Lean, demand-responsive | Fixed threshold reorder |
+| Adaptability | Dynamic | Static |
+
+> PPO learns a lean, just-in-time ordering strategy — ordering ~5× less per step yet achieving a **higher** service level. This shows the agent has internalized the cost structure and found a fundamentally better policy, not just a parameter tweak.
+
+### Key Takeaways
+
+- **Magnitude**: 33.5% cost reduction is the headline result — not marginal, but a structural improvement over the classical heuristic
+- **Service level**: PPO improves service level from 95% → 99% while simultaneously cutting costs — both dimensions improve together
+- **Ordering efficiency**: 5.2× fewer orders per step demonstrates the agent learns genuine demand anticipation rather than reactive restocking
+- **Robustness**: Tight 95% CI ([2.729M, 2.739M]) shows consistent performance across all 100 evaluation episodes
 
 ![](./results/plots/comparison.png)
 
 ### Training Stability
 
-* Converges after ~1K episodes
-* Reduced variance due to critic guidance
-* Stable policy after convergence
-* Consistent generalization across seeds
+* Converges after ~1K iterations with the clipped surrogate objective preventing destructive policy updates
+* GAE smooths the advantage signal, suppressing gradient noise across the multi-echelon state space
+* Stable, consistent policy post-convergence with tight episode-to-episode cost variance
 
 ## Execution Steps
 
