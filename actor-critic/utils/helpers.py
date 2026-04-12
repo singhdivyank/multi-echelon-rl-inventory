@@ -30,7 +30,7 @@ def _setup_directory(base_path: str):
         'base': base_path,
         'checkpoints': os.path.join(base_path, 'checkpoints'),
         'plots': os.path.join(base_path, 'plots'),
-        'log': os.path.join(base_path, 'log'),
+        'logs': os.path.join(base_path, 'logs'),
         'eval': os.path.join(base_path, 'eval')
     }
 

@@ -13,16 +13,14 @@ Modern supply chains involve **multi-echelon inventory systems** where a central
 > We aim to learn an optimal policy 𝜋(𝑎∣𝑠) that minimizes total operational cost
 
 $$
-
-min E[\sum_{t=0}^{T}(C_{holding} + C_{backorder} + Cost_{ordering})]
-
+min\ E\left[\sum_{t=0}^{T}(C_{holding} + C_{backorder} + C_{ordering})\right]
 $$
 
 ## Architecture
 
 We use a shared backbone with two separate heads:
-* Actor (Policy Network): outputs action distribution $$\pi_{\theta}(a|s)$$
-* Critic (Value Network): estimates state value $$V_{\phi}(s)$$
+* Actor (Policy Network): outputs action distribution $\pi_{\theta}(a|s)$
+* Critic (Value Network): estimates state value $V_{\phi}(s)$
 
 Enables **low-variance** policy updates and stable convergence
 
@@ -42,47 +40,35 @@ Tunables:
 **Objective Function** ([Clipped Surrogate Objective Function](https://campus.datacamp.com/courses/deep-reinforcement-learning-in-python/proximal-policy-optimization-and-drl-tips?ex=3)):
 
 $$
-
-L^{CLIP}(\theta) = E[min(r_{t}(\theta)A_{t}, clip(r_{t}(\theta), 1 - \epsilon, 1 + \epsilon)A_t)]
-
+L^{CLIP}(\theta) = E\left[\min\left(r_{t}(\theta)A_{t}, clip(r_{t}(\theta), 1-\epsilon, 1+\epsilon)A_t\right)\right]
 $$
 
 **Value Loss**:
 
 $$
-
-L^{VF} = E[(V(s_{t}) - R_t)^2]
-
+L^{VF} = E\left[(V(s_{t}) - R_t)^2\right]
 $$
 
 **Entropy Bonus**:
 
 $$
-
-L^{ENT} = E[H(\pi(.|s_t))]
-
+L^{ENT} = E\left[H(\pi(\cdot|s_t))\right]
 $$
 
 **Total Loss**: 
 
 $$
-
 L = L^{CLIP} + c_1 L^{VF} + c_2 L^{ENT}
-
 $$
 
 **Advantage Estimation** (reduce variance):
 
 $$
-
 \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)
-
 $$
 
 $$
-
-A_t = \delta_t + \gamma \lambda \delta_{t+1} + ...
-
+A_t = \delta_t + \gamma\lambda\delta_{t+1} + \cdots
 $$
 
 ## Results

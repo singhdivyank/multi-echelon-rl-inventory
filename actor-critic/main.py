@@ -40,7 +40,7 @@ def main(args):
     path_to_dir = config['general']['save_dir']
     dirs = _setup_directory(path_to_dir)
     _save_config(
-        config_path=os.path.join(dirs['log'], 'config.json'),
+        config_path=os.path.join(dirs['logs'], 'config.json'),
         content=config
     )
 
@@ -93,10 +93,10 @@ def main(args):
     # evaluate performance
     elif args.mode == 'eval':
         checkpoint_path = os.path.join(dirs['checkpoints'], 'checkpoint_final.pt')
-        params_path = os.path.join(dirs['log'], 'baseline_params.json')
+        params_path = os.path.join(dirs['logs'], 'baseline_params.json')
         rl_metrics_path = os.path.join(dirs['eval'], 'rl_metrics.json')
         baseline_metrics_path = os.path.join(dirs['eval'], 'baseline_metrics.json')
-        eval_res_path = os.path.join(dirs['log'], 'evaluation_results.json')
+        eval_res_path = os.path.join(dirs['logs'], 'evaluation_results.json')
         
         print("\n--- Loading Pre-trained Agent ---")
         agent.load(checkpoint_path)
@@ -109,7 +109,7 @@ def main(args):
         # Evaluate both policies
         print("\n--- Evaluating Policies ---")
         print("Evaluating A3C agent...")
-        best_model_path = os.path.join(dirs['ceckpoints'], 'best_model.pt')
+        best_model_path = os.path.join(dirs['checkpoints'], 'best_model.pt')
         agent.load(best_model_path)
         rl_metrics = evaluate_agent(
             env,

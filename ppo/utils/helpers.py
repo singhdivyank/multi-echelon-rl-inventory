@@ -43,9 +43,12 @@ def create_directories(save_dir: str) -> List[str]:
 
 def set_device(device: str) -> str:
     if device == 'auto':
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    else:
-        device = device
+        if torch.cuda.is_available():
+            device = 'cuda'
+        elif torch.backends.mps.is_available():
+            device = 'mps'
+        else:
+            device = 'cpu'
     print(f"\nUsing device: {device}")
     return device
 

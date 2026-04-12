@@ -182,10 +182,15 @@ class A3CAgent:
                 _ = torch.zeros(1, device='cuda')
                 print("Using CUDA device")
                 self.device = torch.device("cuda")
-                return 
+                return
             except RuntimeError:
-                print("CUDA report available but failed - alling back to CPU")
-            
+                print("CUDA reported available but failed - falling back")
+
+        if torch.backends.mps.is_available():
+            print("Using MPS device (Apple Silicon)")
+            self.device = torch.device("mps")
+            return
+
         print("Using CPU device")
         self.device = torch.device("cpu")
     

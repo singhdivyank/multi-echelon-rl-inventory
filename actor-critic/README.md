@@ -45,33 +45,25 @@ Key tunables:
 **Advantage Function**:
 
 $$
-
-A(s_t​, a_t​) = R_t ​− V(s_t​)
-
+A(s_t, a_t) = R_t - V(s_t)
 $$
 
 **Actor loss function (Policy Gradient)**
 
 $$
-
-Loss_{actor} = -log\pi_{\theta}(a_t | s_t) . A(s_t, a_t)
-
+Loss_{actor} = -\log\pi_{\theta}(a_t | s_t) \cdot A(s_t, a_t)
 $$
 
 **Critic loss function (Value Function)**
 
 $$
-
 Loss_{critic} = (R_t - V(s_t))^2
-
 $$
 
 **Total Loss**:
 
 $$
-
 L = Loss_{actor} + \lambda Loss_{critic}
-
 $$
 
 

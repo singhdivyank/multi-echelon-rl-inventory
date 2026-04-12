@@ -1,8 +1,29 @@
+# Python
 __pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
 
-*.venv
+# Virtual environments
+.venv/
 venv/
-*.env
 env/
+*.env
 
+# TensorBoard & training logs (keep directory placeholder)
+**/results/logs/**
+!**/results/logs/.gitkeep
+*.tfevents.*
+*.log
+
+# Intermediate / iteration checkpoints (keep only final models)
+ppo/ppo_divergent.pt/
+
+# OS artifacts
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
