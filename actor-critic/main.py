@@ -1,51 +1,32 @@
+"""
+Main execution file
+"""
+
 import argparse
-import json
+import sys
 import os
-from typing import Dict
 
 import numpy as np
-import yaml
 import torch
 
-from meis_env import MEISEnv
-from a3c_agent import A3CAgent
-from trainer import Trainer
-from s_s_policy import sSPolicy, sSPolicyTuner
+from src.meis_env import MEISEnv
+from src.a3c_agent import A3CAgent
+from src.trainer import Trainer
+from src.s_s_policy import sSPolicy, sSPolicyTuner
 from utils.evaluation import compare_policies, evaluate_agent
+from utils.helpers import ( 
+    print_eval_res,
+    _load_config, 
+    _read_metrics,
+    _setup_directory, 
+    _save_config
+)
 from utils.visualisation import (
     plot_training_curves, 
     plot_comparison, 
     plot_cost_per_period, 
     plot_training_curve
 )
-
-def _load_config() -> Dict:
-    """Load configurations from YAML file"""
-
-    with open('config.yaml', 'r') as f:
-        return yaml.safe_load(f)
-
-def _save_config(config_path: str, content: Dict):
-    """Save training config as JSON"""
-
-    with open(config_path, 'w') as f:
-        json.dump(content, f, indent=2)
-    
-    print(f"Configurations saved to: {config_path}")
-
-def _setup_directory(base_path: str):
-    """Create necessary directories"""
-    dirs = {
-        'base': base_path,
-        'checkpoints': os.path.join(base_path, 'checkpoints'),
-        'plots': os.path.join(base_path, 'plots'),
-        'log': os.path.join(base_path, 'log')
-    }
-
-    for dir_path in dirs.values():
-        os.makedirs(dir_path, exist_ok=True)
-    
-    return dirs
 
 
 def main(args):
@@ -87,8 +68,21 @@ def main(args):
     print(f"Network architecture: {agent_config['n_layers']} layers, {agent_config['hidden_size']} neurons")
     print(f"Learning rate: {agent_config['lr']}")
 
+    # Create and tune baseline policy
+    print("\n--- Creating Baseline Policy ---")
+    print("Tuning (s,S) policy parameters...")
+    tuner = sSPolicyTuner(
+        env,
+        n_eval_episodes=config['baseline']['tuning_episodes']
+    )
+    best_params, _ = tuner.tune(
+        maxiter=config['baseline']['tuning_maxiter'],
+        seed=seed_val
+    )
+    baseline_policy = sSPolicy(best_params)
+
     # train model
-    if not args.eval_only:
+    if args.mode == 'train':
         print("\n--- Training A3C Agent ---")
         training_history = Trainer(
             env,
@@ -96,46 +90,27 @@ def main(args):
             config['training'],
             save_dir=dirs['checkpoints']
         ).train()
-    else:
-        print("\n--- Loading Pre-trained Agent ---")
+    # evaluate performance
+    elif args.mode == 'eval':
         checkpoint_path = os.path.join(dirs['checkpoints'], 'checkpoint_final.pt')
+        params_path = os.path.join(dirs['log'], 'baseline_params.json')
+        rl_metrics_path = os.path.join(dirs['eval'], 'rl_metrics.json')
+        baseline_metrics_path = os.path.join(dirs['eval'], 'baseline_metrics.json')
+        eval_res_path = os.path.join(dirs['log'], 'evaluation_results.json')
+        
+        print("\n--- Loading Pre-trained Agent ---")
         agent.load(checkpoint_path)
         print(f"Loaded checkpoint from: {checkpoint_path}")
         
-        # Load training history if available
-        history_path = os.path.join(dirs['checkpoints'], 'training_history.json')
-        if os.path.exists(history_path):
-            with open(history_path, 'r') as f:
-                training_history = json.load(f)
-        else:
-            training_history = None
-        
-        # Create and tune baseline policy
-        print("\n--- Creating Baseline Policy ---")
-        print("Tuning (s,S) policy parameters...")
-        baseline_config = config['baseline']
-        tuner = sSPolicyTuner(
-            env,
-            n_eval_episodes=baseline_config['tuning_episodes']
-        )
-        best_params, _ = tuner.tune(
-            maxiter=baseline_config['tuning_maxiter'],
-            seed=seed_val
-        )
-        baseline_policy = sSPolicy(best_params)
-        
         # Save tuned parameters
-        params_path = os.path.join(dirs['log'], 'baseline_params.json')
-        with open(params_path, 'w') as f:
-            json.dump(best_params, f, indent=2)
-        
+        _save_config(config_path=params_path, content=best_params)
         print(f"Baseline parameters saved to: {params_path}")
 
         # Evaluate both policies
         print("\n--- Evaluating Policies ---")
         print("Evaluating A3C agent...")
-        
-        agent.load("./results/checkpoints/best_model.pt")
+        best_model_path = os.path.join(dirs['ceckpoints'], 'best_model.pt')
+        agent.load(best_model_path)
         rl_metrics = evaluate_agent(
             env,
             agent=agent,
@@ -143,14 +118,8 @@ def main(args):
             seed=seed_val,
             verbose=True
         )
-        
-        print(f"\nA3C Agent:")
-        print(f"  Mean Cost: {rl_metrics['mean_cost']:.2f} ± {rl_metrics['std_cost']:.2f}")
-        print(f"  Mean Service Level: {rl_metrics['mean_service_level']:.2%} ± {rl_metrics['std_service_level']:.2%}")
-        print(f"  Cost Breakdown:")
-        print(f"    Shortage: {rl_metrics['cost_breakdown']['shortage']:.2f}")
-        print(f"    Holding: {rl_metrics['cost_breakdown']['holding']:.2f}")
-        print(f"    Reordering: {rl_metrics['cost_breakdown']['reordering']:.2f}")
+        _save_config(config_path=rl_metrics_path, content=rl_metrics)
+        print_eval_res(eval_res=rl_metrics, agent='a3c')
 
         print("\nEvaluating baseline policy...")
         baseline_metrics = evaluate_agent(
@@ -160,62 +129,68 @@ def main(args):
             seed=seed_val,
             verbose=True
         )
-
-        print(f"\n(s,S) Baseline:")
-        print(f"  Mean Cost: {baseline_metrics['mean_cost']:.2f} ± {baseline_metrics['std_cost']:.2f}")
-        print(f"  Mean Service Level: {baseline_metrics['mean_service_level']:.2%} ± {baseline_metrics['std_service_level']:.2%}")
-        print(f"  Cost Breakdown:")
-        print(f"    Shortage: {baseline_metrics['cost_breakdown']['shortage']:.2f}")
-        print(f"    Holding: {baseline_metrics['cost_breakdown']['holding']:.2f}")
-        print(f"    Reordering: {baseline_metrics['cost_breakdown']['reordering']:.2f}")
+        _save_config(config_path=baseline_metrics_path, content=baseline_metrics)
+        print_eval_res(eval_res=baseline_metrics, agent='baseline')
 
         # Compare results
         print("\n--- Comparison Results ---")
         comparison = compare_policies(rl_metrics, baseline_metrics)
-        print(f"\nImprovement:")
-        print(f"  Cost: {comparison['cost_improvement_percent']:.2f}%")
-        print(f"  Service Level: {comparison['service_level_improvement_percent']:.2f}%")
-        print(f"  Statistical Significance (cost): {comparison['cost_ttest']['significant']} (p={comparison['cost_ttest']['p_value']:.4f})")
-        print(f"  Effect Size (Cohen's d): {comparison['cohens_d_cost']:.3f}")
+        print_eval_res(eval_res=comparison)
 
         # Save evaluation results
         eval_results = {
-            'rl': {k: (v.tolist() if isinstance(v, np.ndarray) else v)
-                   for k, v in rl_metrics.items()},
-            'baseline': {k: (v.tolist() if isinstance(v, np.ndarray) else v)
-                         for k, v in baseline_metrics.items()},
+            'rl': {
+                k: (v.tolist() if isinstance(v, np.ndarray) else v)
+                for k, v in rl_metrics.items()
+            },
+            'baseline': {
+                k: (v.tolist() if isinstance(v, np.ndarray) else v)
+                for k, v in baseline_metrics.items()
+            },
             'comparison': comparison,
         }
-        eval_path = os.path.join(dirs['log'], 'evaluation_results.json')
-        with open(eval_path, 'w') as f:
-            json.dump(eval_results, f, indent=2)
-        print(f"\nEvaluation results saved to: {eval_path}")
+        _save_config(config_path=eval_res_path, content=eval_results)
+        print(f"\nEvaluation results saved to: {eval_res_path}")
+    # visualise results
+    else:
+        history_path = os.path.join(dirs['checkpoints'], 'training_history.json')
+        training_history = _read_metrics(metrics_path=history_path)
 
-        # Create visualizations
-        if training_history is not None:
-            print("\n--- Creating Visualizations ---")
-            os.makedirs(dirs['plots'], exist_ok=True)
-            print("\nGenerating visualisations...")
+        if training_history is None:
+            print("No training history found ... Please train the model.")
+            sys.exit(1)
+        
+        print("\nGenerating visualisations...")
+        plot_training_curves(
+            training_history,
+            save_path=os.path.join(dirs['plots'], 'training_curves.png')
+        )
+        plot_training_curve(
+            training_history,
+            save_path=os.path.join(dirs['plots'], 'training_curve.png')
+        )
 
-            plot_training_curves(
-                training_history,
-                save_path=os.path.join(dirs['plots'], 'training_curves.png')
-            )
-            plot_comparison(
-                rl_metrics,
-                baseline_metrics,
-                save_path=os.path.join(dirs['plots'], 'comparison.png')
-            )
-            plot_cost_per_period(
-                env,
-                agent,
-                baseline_policy,
-                save_path=os.path.join(dirs['plots'], 'cost_per_period.png')
-            )
-            plot_training_curve(
-                training_history,
-                save_path=os.path.join(dirs['plots'], 'training_curve.png')
-            )
+        rl_metrics =_read_metrics(metrics_path=rl_metrics_path)
+        if rl_metrics is None:
+            print("No rl training metrics found.. Exiting")
+            sys.exit(1)
+        
+        baseline_metrics = _read_metrics(metrics_path=baseline_metrics_path)
+        if baseline_metrics is None:
+            print("No baseline metrics found.. Exiting")
+            sys.exit(1)
+        
+        plot_comparison(
+            rl_metrics,
+            baseline_metrics,
+            save_path=os.path.join(dirs['plots'], 'comparison.png')
+        )
+        plot_cost_per_period(
+            env,
+            agent,
+            baseline_policy,
+            save_path=os.path.join(dirs['plots'], 'cost_per_period.png')
+        )
 
         print("\n" + "="*60)
         print("TRAINING AND EVALUATION COMPLETE")
@@ -226,9 +201,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train A3C agent on MEIS environment")
     parser.add_argument(
-        '--eval-only',
-        action='store_true',
-        help='Only evauate pre-trained model'
+        '--mode',
+        type=str,
+        default='train',
+        choices=['train', 'eval', 'plot'],
+        help='Mode: train, eval, or plot'
     )
     args = parser.parse_args()
     main(args)

@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from models.actor_critic import ActorCritic
-from utils.replay_buffer import PPOBuffer
+from models.replay_buffer import PPOBuffer
 from utils.metrics import compute_gae
 
 

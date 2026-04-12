@@ -16,7 +16,7 @@ class Actor(nn.Module):
     Outputs mean of action distribution (std is learned separately)
     """
 
-    def __init__(self, state_dim: int, action_dim: int, hidden_dims: List[int, int]):
+    def __init__(self, state_dim: int, action_dim: int, hidden_dims: List[int]):
         super(Actor, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -111,7 +111,7 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     """"""
 
-    def __init__(self, state_dim: int, hidden_dims: List[int, int]):
+    def __init__(self, state_dim: int, hidden_dims: List[int]):
         super(Critic, self).__init__()
         self.state_dim = state_dim
         self.hidden_dims = hidden_dims
@@ -155,7 +155,7 @@ class Critic(nn.Module):
 class ActorCritic(nn.Module):
     """Combined Actor-Critic model"""
 
-    def __init__(self, state_dim: int, action_dim: int, hidden_dims: List[int, int]):
+    def __init__(self, state_dim: int, action_dim: int, hidden_dims: List[int]):
         super(ActorCritic, self).__init__()
         self.actor = Actor(state_dim, action_dim, hidden_dims)
         self.critic = Critic(state_dim, hidden_dims)

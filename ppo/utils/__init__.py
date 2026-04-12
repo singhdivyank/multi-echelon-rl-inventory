@@ -9,7 +9,6 @@ from .helpers import (
 )
 from .logger import Logger
 from .metrics import compute_confidence_interval, compute_gae
-from .replay_buffer import PPOBuffer
 from .visualise_helpers import (
     compare_ppo_baseline, 
     _plot_baseline, 
@@ -20,7 +19,6 @@ from .visualise_helpers import (
 
 __all__ = [
     "Logger",
-    "PPOBuffer", 
     "compare_ppo_baseline", 
     "compute_confidence_interval", 
     "compute_gae",

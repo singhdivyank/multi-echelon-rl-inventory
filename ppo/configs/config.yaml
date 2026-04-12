@@ -1,6 +1,6 @@
 ppo:
   # training parameters
-  iterations: 1000
+  iterations: 5000
   # network architecture
   hidden_layers: [64, 64]
   activation: tanh

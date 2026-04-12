@@ -13,14 +13,11 @@ from typing import Dict, Tuple
 
 import numpy as np
 import gym
-import yaml
+
+from utils.helpers import _get_meis_env
 
 WAREHOUSES = ['middle', 'leaf1', 'leaf2']
 LEAF_WAREHOUSES = ['leaf1', 'leaf2']
-
-def _get_meis_env() -> Dict:
-    with open('meisConfig.yaml', 'r') as f:
-        return yaml.safe_load(f)
 
 class MEISEnv(gym.Env):
     

@@ -1,3 +1,7 @@
+"""
+Utility functions for model training and evaluation
+"""
+
 import json
 import os
 from typing import Dict, List
@@ -9,7 +13,7 @@ from ruamel.yaml import YAML
 def load_config() -> Dict:
     """Load configurations from YAML file"""
 
-    with open('config.yaml', 'r') as f:
+    with open('./configs/config.yaml', 'r') as f:
         config = YAML().load(f)
         return config
 

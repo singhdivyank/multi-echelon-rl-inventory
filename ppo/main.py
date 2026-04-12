@@ -7,9 +7,9 @@ import argparse
 import os
 import sys
 
-from code.evaluate import eval_agents
-from code.visualise import plot_comparison, plot_training_curves
-from code.train import train_agents
+from src.evaluate import eval_agents
+from src.visualise import plot_comparison, plot_training_curves
+from src.train import train_agents
 from utils.helpers import (
     create_directories, 
     load_config,

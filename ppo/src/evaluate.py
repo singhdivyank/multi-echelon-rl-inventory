@@ -1,3 +1,12 @@
+"""
+Evaluation Utilities
+
+Functions for evaluating and comparing RL agent and baseline policies across:
+- Multiple random seeds
+- Different metrics (cost, service level, etc.)
+- Statistical significance testing
+"""
+
 import os
 from typing import Dict
 

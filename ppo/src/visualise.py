@@ -21,7 +21,7 @@ def plot_training_curves(
         save_path: Path to save figure
     """
 
-    from ..utils.visualise_helpers import (
+    from utils.visualise_helpers import (
         _plot_baseline, 
         _plot_with_confidence, 
         _plot_loss

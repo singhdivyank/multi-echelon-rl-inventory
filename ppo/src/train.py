@@ -1,3 +1,13 @@
+"""
+Training Loop for PPO Agent
+
+Implements the training procedure with:
+- Episode rollouts
+- Advantage computation
+- Policy updates
+- Logging and checkpointing
+"""
+
 import os
 
 from datetime import datetime
@@ -39,7 +49,7 @@ def train_ppo(
         Training statistics
     """
 
-    from code.evaluate import evaluate_policy
+    from src.evaluate import evaluate_policy
 
     print(f"\nStarting PPO training for {num_iterations} iterations...")
     stats = {
@@ -172,7 +182,7 @@ def train_agents(
 ) -> Dict:
     """Train PPO and Baseline agents"""
 
-    from code.evaluate import evaluate_baseline
+    from src.evaluate import evaluate_baseline
 
     print("="*80)
     print("Training Divergent Inventory Optimization")
