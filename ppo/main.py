@@ -31,30 +31,38 @@ def main(args):
     set_seeds(seed_val)
 
     general_config = dict(config['general'])
-    save_dir = general_config['save_dir']
+    # Scope save_dir per env so Env-1 artifacts are never clobbered.
+    base_save_dir = general_config['save_dir']
+    env_name = args.env
+    if env_name == 'divergent':
+        save_dir = base_save_dir
+    else:
+        save_dir = f"{base_save_dir.rstrip('/\\')}_{env_name}"
     dirs = create_directories(save_dir)
 
     device_name = set_device(general_config['device'])
-    env_config = dict(config['divergent'])
+    env_config = dict(config[env_name])
 
     if args.mode == 'train':
         best_model_path = os.path.join(dirs[1], 'ppo_divergent.pt')
         stats_path = os.path.join(save_dir, 'training_stats.json')
         training_stats = train_agents(
-            env_config=env_config, 
-            config=ppo_config, 
+            env_config=env_config,
+            config=ppo_config,
             save_dirs=dirs,
             device=device_name,
-            best_model_path=best_model_path
+            best_model_path=best_model_path,
+            env_name=env_name,
         )
         save_stats(stats=training_stats, save_path=stats_path)
     elif args.mode == 'eval':
         eval_path = os.path.join(save_dir, 'evaluation_results.json')
         eval_results = eval_agents(
-            config=ppo_config, 
-            env_config=env_config, 
+            config=ppo_config,
+            env_config=env_config,
             checkpoint_path=dirs[1],
-            device_name=device_name
+            device_name=device_name,
+            env_name=env_name,
         )
         save_eval_results(results=eval_results, save_path=eval_path)
     else:
@@ -95,6 +103,13 @@ if __name__ == '__main__':
         default='train',
         choices=['train', 'eval', 'plot'],
         help='Mode: train, eval, or plot'
+    )
+    parser.add_argument(
+        '--env',
+        type=str,
+        default='divergent',
+        choices=['divergent', 'complex'],
+        help='Environment variant: original divergent (Env-1) or complex (Env-2)'
     )
     args = parser.parse_args()
     main(args)

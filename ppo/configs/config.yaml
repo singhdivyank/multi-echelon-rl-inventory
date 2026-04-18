@@ -58,6 +58,60 @@ divergent:
   it: 1000
   ib: 450
 
+complex:
+  structure: complex_divergent
+  # Demand Parameters (not used directly, but kept for compatibility with base class loader)
+  lambda_w: 1
+  lambda_w_r: 10
+  d_i: Pois(Unif[5,15])
+  # Network Structure
+  K: 4
+  num_retailers: 3
+  # Cost Parameters (base)
+  h_w: 1
+  h_r: 1
+  b_w: 0
+  b_r: 19
+  # State Space Upper Bounds (widened for harder demand / shocks)
+  max_inventory_warehouse: 2000
+  max_inventory_buffer: 900
+  max_in_transit_w_r: 500
+  max_backorder_r: 400
+  max_outstanding_w: 600
+  max_orders_w: 80
+  # Episode parameters
+  max_steps: 500
+  warmup_steps: 100
+  it: 1000
+  ib: 450
+  # --- Complex-env-only stressors ---
+  # Seasonal, non-stationary demand: mean_t = base * (1 + amp*sin(2*pi*t/period)) + trend*t
+  demand_base: 12.0
+  demand_amplitude: 0.7
+  demand_period: 120.0
+  demand_trend: 0.0
+  demand_noise_std: 2.5
+  # Correlation in [0,1] between retailer demands via shared latent factor
+  demand_corr: 0.6
+  # Demand shocks
+  shock_prob: 0.015
+  shock_multiplier_range: [2.0, 3.0]
+  shock_duration_range: [3, 7]
+  # Stochastic lead times
+  lead_time_mean: 2.0
+  lead_time_std: 1.2
+  lead_time_spike_prob: 0.08
+  lead_time_spike_extra: 4
+  lead_time_max: 10
+  # Stochastic supplier + warehouse outbound capacities
+  supplier_capacity_mean: 70.0
+  supplier_capacity_std: 15.0
+  warehouse_capacity_mean: 50.0
+  warehouse_capacity_std: 12.0
+  # Partial lost sales
+  lost_sales_fraction: 0.3
+  lost_sales_penalty: 5.0
+
 general:
   seed: 42
   save_dir: './results'

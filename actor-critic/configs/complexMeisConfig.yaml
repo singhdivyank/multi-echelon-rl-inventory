@@ -1,0 +1,69 @@
+# Complex MEIS environment config.
+#
+# Keeps the same topology / state / action spaces as meisConfig.yaml so the
+# A3C actor head does not need to change. Only the dynamics are harder.
+
+max_steps_per_episode: 365
+
+factory:
+  ioh_initial: .inf
+  lead_time_mean: 0
+  lead_time_std: 0
+  price_per_product: 0
+  min_reorder_cost: 0
+  reorder_cost_constant: 0
+  shortage_cost_constant: 0
+  holding_cost_constant: 0
+
+middle:
+  ioh_initial: 10000
+  lead_time_mean: 2
+  lead_time_std: 1
+  price_per_product: 50
+  min_reorder_cost: 1000
+  reorder_cost_constant: 0
+  shortage_cost_constant: 1
+  holding_cost_constant: 0.03
+  reorder_qty_options: [5000, 10000, 15000, 20000]
+
+leaf:
+  ioh_initial: 5000
+  demand_mean: 3300
+  demand_std: 300          # wider idio noise vs. 100 in the simple env
+  lead_time_mean: 2
+  lead_time_std: 1
+  price_per_product: 100
+  min_reorder_cost: 5000
+  reorder_cost_constant: 0.5
+  shortage_cost_constant: 2
+  holding_cost_constant: 0.05
+  max_backlog_duration: 5   # shorter window -> more lost sales
+  reorder_qty_options: [3000, 6000, 9000, 12000]
+
+env:
+  n_warehouses: 3
+  state_dim_per_warehouse: 4
+  total_state_dim: 12
+
+# --- Complex-env-only stressors ---
+complex:
+  # Seasonal demand: mean_t = leaf.demand_mean * (1 + amp*sin(2*pi*t/period)) + trend*t
+  demand_amplitude: 0.5
+  demand_period: 90
+  demand_trend: 0.0
+  # Correlation across leaves via shared latent factor (0..1)
+  demand_corr: 0.6
+  # Demand shocks
+  shock_prob: 0.02
+  shock_multiplier_range: [1.8, 2.5]
+  shock_duration_range: [3, 7]
+  # Heavier-tailed lead times
+  lead_time_spike_prob: 0.10
+  lead_time_spike_extra: 3
+  lead_time_std_mult: 2.0
+  lead_time_max: 10
+  # Middle-warehouse outbound capacity cap (units/day)
+  middle_capacity_mean: 12000
+  middle_capacity_std: 3000
+  # Lost-sales penalty applied to units that age out of the backlog window
+  lost_sales_penalty: 3.0

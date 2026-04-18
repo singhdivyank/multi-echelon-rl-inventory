@@ -18,6 +18,7 @@ import numpy as np
 
 from models.baseline import BaselineAgent
 from models.env import DivergentInventoryEnv
+from models.env_complex import ComplexDivergentInventoryEnv
 from models.ppo import PPOAgent
 from utils.logger import Logger
 
@@ -159,8 +160,8 @@ def train_ppo(
                 print(f"  New best model saved! Cost: {eval_cost:.2f}")
         
         if iteration > 0 and not iteration % save_interval:
-            model_path_base = os.path.basename(best_model_path)
-            checkpoint_path = os.path.join(model_path_base, f'ppo_divergent_iter_{iteration}.pt')
+            model_dir = os.path.dirname(best_model_path) or '.'
+            checkpoint_path = os.path.join(model_dir, f'ppo_divergent_iter_{iteration}.pt')
             agent.save(checkpoint_path)
     
     progress_bar.close()
@@ -174,22 +175,24 @@ def train_ppo(
     return stats
 
 def train_agents(
-    env_config: Dict, 
-    config: Dict, 
+    env_config: Dict,
+    config: Dict,
     save_dirs: List[str],
     device: str,
-    best_model_path: str
+    best_model_path: str,
+    env_name: str = 'divergent',
 ) -> Dict:
     """Train PPO and Baseline agents"""
 
     from src.evaluate import evaluate_baseline
 
     print("="*80)
-    print("Training Divergent Inventory Optimization")
+    print(f"Training PPO on env '{env_name}'")
     print("="*80)
 
     # Create environment
-    env = DivergentInventoryEnv(config=env_config)
+    env_cls = ComplexDivergentInventoryEnv if env_name == 'complex' else DivergentInventoryEnv
+    env = env_cls(config=env_config)
     print(f"\nEnvironment created:")
     print(f"  State dimension: {env.observation_space.shape[0]}")
     print(f"  Action dimension: {env.action_space.shape[0]}")
@@ -197,7 +200,7 @@ def train_agents(
 
     # Create Logger
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = os.path.join(save_dirs[2], f'divergent_{timestamp}')
+    log_dir = os.path.join(save_dirs[2], f'{env_name}_{timestamp}')
     logger = Logger(log_dir)
 
     # Train PPO agent

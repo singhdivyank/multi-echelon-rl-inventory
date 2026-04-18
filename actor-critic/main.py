@@ -10,16 +10,18 @@ import numpy as np
 import torch
 
 from src.meis_env import MEISEnv
+from src.complex_meis_env import ComplexMEISEnv
 from src.a3c_agent import A3CAgent
 from src.trainer import Trainer
 from src.s_s_policy import sSPolicy, sSPolicyTuner
 from utils.evaluation import compare_policies, evaluate_agent
-from utils.helpers import ( 
+from utils.helpers import (
     print_eval_res,
-    _load_config, 
+    _get_complex_meis_env,
+    _load_config,
     _read_metrics,
-    _setup_directory, 
-    _save_config
+    _setup_directory,
+    _save_config,
 )
 from utils.visualisation import (
     plot_training_curves, 
@@ -37,7 +39,13 @@ def main(args):
     np.random.seed(seed_val)
     torch.manual_seed(seed_val)
 
-    path_to_dir = config['general']['save_dir']
+    # Scope save_dir per env so Env-1 artifacts are never clobbered.
+    base_save_dir = config['general']['save_dir']
+    env_name = args.env
+    if env_name == 'meis':
+        path_to_dir = base_save_dir
+    else:
+        path_to_dir = f"{base_save_dir.rstrip('/\\')}_{env_name}"
     dirs = _setup_directory(path_to_dir)
     _save_config(
         config_path=os.path.join(dirs['logs'], 'config.json'),
@@ -53,7 +61,10 @@ def main(args):
 
     # Create environment
     print("\n--- Creating Environment ---")
-    env = MEISEnv()
+    if env_name == 'complex':
+        env = ComplexMEISEnv(config=_get_complex_meis_env())
+    else:
+        env = MEISEnv()
     print(f"State dimension: {env.observation_space.shape[0]}")
     print(f"Action dimension: {env.action_space.n}")
 
@@ -206,6 +217,13 @@ if __name__ == "__main__":
         default='train',
         choices=['train', 'eval', 'plot'],
         help='Mode: train, eval, or plot'
+    )
+    parser.add_argument(
+        '--env',
+        type=str,
+        default='meis',
+        choices=['meis', 'complex'],
+        help='Environment variant: original MEIS (Env-1) or complex MEIS (Env-2)'
     )
     args = parser.parse_args()
     main(args)
