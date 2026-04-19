@@ -225,7 +225,9 @@ def train_agents(
         eval_episodes=config['eval_episodes'],
         best_model_path=best_model_path
     )
-    ppo_save_path = os.path.join(save_dirs[0], 'ppo_divergent_final.pt')
+    # save_dirs: [base, checkpoints, logs, plots]. Final model belongs in
+    # the checkpoints subdir, which is also where evaluate_agents() looks.
+    ppo_save_path = os.path.join(save_dirs[1], 'ppo_divergent_final.pt')
     ppo_agent.save(ppo_save_path)
     print(f"\nPPO agent saved to {ppo_save_path}")
 
@@ -240,7 +242,7 @@ def train_agents(
         num_episodes=config['eval_episodes'],
         logger=logger
     )
-    baseline_save_path = os.path.join(save_dirs[0], 'baseline_divergent.npy')
+    baseline_save_path = os.path.join(save_dirs[1], 'baseline_divergent.npy')
     baseline_agent.save(baseline_save_path)
 
     # Generate stats

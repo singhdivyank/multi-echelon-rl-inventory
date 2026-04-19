@@ -45,11 +45,22 @@ Classical inventory heuristic used as benchmark
 
 ## Results Summary
 
-| Model | Key Results |
-| ----- | ----------- |
-| (s, S) | Strong baseline |
-| A3C | 1.5% cost improvement |
-| PPO | 33% cost reduction |
+Each algorithm is trained and evaluated on two environments: the original
+stationary formulation (**Env-1**) and a harder non-stationary variant
+with seasonal demand, correlated retailer demand, demand shocks,
+heavy-tailed lead times, and stochastic capacity caps (**Env-2**).
+
+| Algorithm | Env-1 (stationary) | Env-2 (non-stationary) |
+| --------- | ------------------ | ---------------------- |
+| PPO vs. fixed base-stock heuristic | **+36.76%** cost reduction | **+94.20%** cost reduction |
+| A3C vs. retuned (s,S) policy       | **+1.64%** cost reduction  | **-21.79%** (heuristic wins) |
+
+The negative A3C/Env-2 result is intentional and discussed in the report:
+single-environment evaluation of deep-RL inventory policies is not
+reliable evidence of real robustness.
+
+**Full writeup with figures, methodology, and threats to validity**:
+see [`docs/report.md`](docs/report.md).
 
 # Project Structure
 
@@ -116,22 +127,38 @@ source .venv/bin/activate       # activate virtual environment
 pip install -r requirements.txt # install all required dependencies
 ```
 
+Each algorithm accepts `--env` to pick the environment variant. Artifacts
+from Env-1 and Env-2 are written to separate directories
+(`results/` vs `results_complex/`) so the two experiments never clobber
+each other.
+
 ## Run A3C
 
 ``` bash
 cd actor-critic
-python3 main.py --mode train    # train agent
-python3 main.py --mode eval     # evaluate performance against baseline
-python3 main.py --mode plot     # visualise training curves and evaluation results
+python3 main.py --mode train --env meis      # train on Env-1 (original MEIS)
+python3 main.py --mode train --env complex   # train on Env-2 (non-stationary MEIS)
+python3 main.py --mode eval  --env meis      # evaluate on Env-1
+python3 main.py --mode eval  --env complex   # evaluate on Env-2
 ```
 
 ## Run PPO
 
 ``` bash
 cd ppo
-python3 main.py --mode train    # train agent
-python3 main.py --mode eval     # evaluate performance against baseline
-python3 main.py --mode plot     # visualise training curves and evaluation results
+python3 main.py --mode train --env divergent # train on Env-1 (divergent supply chain)
+python3 main.py --mode train --env complex   # train on Env-2 (non-stationary)
+python3 main.py --mode eval  --env divergent # evaluate on Env-1
+python3 main.py --mode eval  --env complex   # evaluate on Env-2
+```
+
+## Smoke test + report
+
+From the repo root:
+
+``` bash
+python scripts/smoke_env.py     # end-to-end sanity check for all 4 (algo, env) combos
+python scripts/make_report.py   # rebuild docs/report.md + figures from saved JSONs
 ```
 
 # Platform Independence

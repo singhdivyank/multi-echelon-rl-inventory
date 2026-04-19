@@ -52,6 +52,16 @@ def main(args):
         content=config
     )
 
+    # Pre-bind all artifact paths so every mode can reference them without
+    # the plot branch NameError-ing when eval was run in a separate process.
+    checkpoint_path = os.path.join(dirs['checkpoints'], 'checkpoint_final.pt')
+    best_model_path = os.path.join(dirs['checkpoints'], 'best_model.pt')
+    params_path = os.path.join(dirs['logs'], 'baseline_params.json')
+    rl_metrics_path = os.path.join(dirs['eval'], 'rl_metrics.json')
+    baseline_metrics_path = os.path.join(dirs['eval'], 'baseline_metrics.json')
+    eval_res_path = os.path.join(dirs['logs'], 'evaluation_results.json')
+    history_path = os.path.join(dirs['checkpoints'], 'training_history.json')
+
     print("\n" + "="*60)
     print("MULTI-ECHELON INVENTORY SYSTEM - A3C TRAINING")
     print("="*60)
@@ -79,17 +89,25 @@ def main(args):
     print(f"Network architecture: {agent_config['n_layers']} layers, {agent_config['hidden_size']} neurons")
     print(f"Learning rate: {agent_config['lr']}")
 
-    # Create and tune baseline policy
+    # Create and tune baseline policy. Tuning is expensive
+    # (differential_evolution over tuning_maxiter * tuning_episodes rollouts),
+    # so reuse cached params whenever available. Train mode always retunes so
+    # the training run is self-contained and reproducible.
     print("\n--- Creating Baseline Policy ---")
-    print("Tuning (s,S) policy parameters...")
-    tuner = sSPolicyTuner(
-        env,
-        n_eval_episodes=config['baseline']['tuning_episodes']
-    )
-    best_params, _ = tuner.tune(
-        maxiter=config['baseline']['tuning_maxiter'],
-        seed=seed_val
-    )
+    cached = _read_metrics(metrics_path=params_path) if args.mode != 'train' else None
+    if cached is not None:
+        print(f"Loaded cached (s,S) parameters from: {params_path}")
+        best_params = cached
+    else:
+        print("Tuning (s,S) policy parameters...")
+        tuner = sSPolicyTuner(
+            env,
+            n_eval_episodes=config['baseline']['tuning_episodes']
+        )
+        best_params, _ = tuner.tune(
+            maxiter=config['baseline']['tuning_maxiter'],
+            seed=seed_val
+        )
     baseline_policy = sSPolicy(best_params)
 
     # train model
@@ -103,16 +121,11 @@ def main(args):
         ).train()
     # evaluate performance
     elif args.mode == 'eval':
-        checkpoint_path = os.path.join(dirs['checkpoints'], 'checkpoint_final.pt')
-        params_path = os.path.join(dirs['logs'], 'baseline_params.json')
-        rl_metrics_path = os.path.join(dirs['eval'], 'rl_metrics.json')
-        baseline_metrics_path = os.path.join(dirs['eval'], 'baseline_metrics.json')
-        eval_res_path = os.path.join(dirs['logs'], 'evaluation_results.json')
-        
         print("\n--- Loading Pre-trained Agent ---")
-        agent.load(checkpoint_path)
-        print(f"Loaded checkpoint from: {checkpoint_path}")
-        
+        if os.path.exists(checkpoint_path):
+            agent.load(checkpoint_path)
+            print(f"Loaded checkpoint from: {checkpoint_path}")
+
         # Save tuned parameters
         _save_config(config_path=params_path, content=best_params)
         print(f"Baseline parameters saved to: {params_path}")
@@ -120,7 +133,6 @@ def main(args):
         # Evaluate both policies
         print("\n--- Evaluating Policies ---")
         print("Evaluating A3C agent...")
-        best_model_path = os.path.join(dirs['checkpoints'], 'best_model.pt')
         agent.load(best_model_path)
         rl_metrics = evaluate_agent(
             env,
@@ -164,7 +176,6 @@ def main(args):
         print(f"\nEvaluation results saved to: {eval_res_path}")
     # visualise results
     else:
-        history_path = os.path.join(dirs['checkpoints'], 'training_history.json')
         training_history = _read_metrics(metrics_path=history_path)
 
         if training_history is None:

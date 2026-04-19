@@ -152,16 +152,22 @@ class BaselineAgent:
         np.save(path, params)
     
     def load(self, path: str):
-        """
-        Load baseline parameters
-        
-        Args:
-            path: Load path
-        """
+        """Load baseline parameters. Refuses stale files written by the
+        pre-fix action_dim bug (where base_stock_retailers had state-dim
+        entries instead of num_retailers)."""
 
         params = np.load(path, allow_pickle=True).item()
+        loaded_retailers = np.asarray(params['base_stock_retailers'])
+        expected = self.base_stock_retailers.shape[0]
+        if loaded_retailers.shape[0] != expected:
+            print(
+                f"[BaselineAgent.load] Ignoring stale checkpoint {path}: "
+                f"retailer base-stock shape {loaded_retailers.shape} != "
+                f"expected ({expected},). Using freshly-initialized params."
+            )
+            return
         self.base_stock_warehouse = params['base_stock_warehouse']
-        self.base_stock_retailers = params['base_stock_retailers']
+        self.base_stock_retailers = loaded_retailers
     
     def get_value(self, state: np.ndarray) -> float:
         """
