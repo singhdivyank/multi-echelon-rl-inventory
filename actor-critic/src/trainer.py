@@ -83,7 +83,7 @@ class Trainer:
         for fname in os.listdir(self.save_dir):
             m = pattern.match(fname)
             if m:
-                ep = int(m.group())
+                ep = int(m.group(1))
                 if ep > best_ep:
                     best_ep = ep
                     best_path = os.path.join(self.save_dir, fname)
@@ -293,7 +293,7 @@ class Trainer:
         start_episode = 0
         latest_chkpt = self._find_latest_checkpoint()
         if latest_chkpt is not None:
-            start_episode = self._load_checkpoint(latest_chkpt)
+            start_episode = self._load_chkpt(latest_chkpt)
             print(f"Resumed from checkpoint: {latest_chkpt} (episode {start_episode})")
         
         print(f"Starting training for {self.n_episodes} episodes "

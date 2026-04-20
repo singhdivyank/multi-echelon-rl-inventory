@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from models.baseline import BaselineAgent
 from models.env import DivergentInventoryEnv
+from models.env_complex import ComplexDivergentInventoryEnv
 from utils.logger import Logger
 from utils.metrics import compute_confidence_interval
 
@@ -217,20 +218,22 @@ def evaluate_policy(agent, env, num_episodes: int):
     return np.mean(costs), np.mean(rewards)
 
 def eval_agents(
-    config: Dict, 
-    env_config: Dict, 
+    config: Dict,
+    env_config: Dict,
     checkpoint_path: str,
-    device_name: str
+    device_name: str,
+    env_name: str = 'divergent',
 ) -> Dict:
     """Evaluate trained agents"""
 
     from models.ppo import PPOAgent
 
     print("\n" + "="*80)
-    print("Evaluating Agents")
+    print(f"Evaluating PPO on env '{env_name}'")
     print("="*80)
 
-    env = DivergentInventoryEnv(env_config)
+    env_cls = ComplexDivergentInventoryEnv if env_name == 'complex' else DivergentInventoryEnv
+    env = env_cls(env_config)
     
     # Load PPO agent
     ppo_agent = PPOAgent(

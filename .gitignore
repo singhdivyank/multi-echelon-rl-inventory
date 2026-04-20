@@ -10,14 +10,32 @@ venv/
 env/
 *.env
 
-# TensorBoard & training logs (keep directory placeholder)
-**/results/logs/**
-!**/results/logs/.gitkeep
+# TensorBoard event dumps and raw log files (PPO writes them under
+# results/logs/<run>/; A3C saves small JSON summaries under logs/ which
+# we DO keep, so exclude by file-type rather than by directory).
 *.tfevents.*
+**/events.out.tfevents.*
 *.log
 
-# Intermediate / iteration checkpoints (keep only final models)
-ppo/ppo_divergent.pt/
+# Intermediate PPO periodic checkpoints (keep only best + final).
+**/ppo_divergent_iter_*.pt
+
+# LaTeX build artefacts (keep .tex and .pdf, drop everything else).
+docs/*.aux
+docs/*.out
+docs/*.log
+docs/*.toc
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.synctex.gz
+docs/*.bbl
+docs/*.blg
+
+# Unzipped AAAI-26 AuthorKit (~7 MB).  The three files we actually need
+# (aaai2026.sty, aaai2026.bst) are copied into docs/ and committed.  The
+# full kit is available from https://aaai.org/authorkit26-1/.
+AuthorKit26/
+AuthorKit26*.zip
 
 # OS artifacts
 .DS_Store
@@ -27,3 +45,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+#Poster
+Poster/
+
+AuthorKit26/

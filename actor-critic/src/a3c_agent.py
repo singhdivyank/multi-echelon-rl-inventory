@@ -219,7 +219,7 @@ class A3CAgent:
 
         state = state / 10000
         state_tensor = torch.FloatTensor(state).to(self.device)
-        action, log_prob, value = self.network.get_action(state_tensor, deterministic=False)
+        action, log_prob, value = self.network.get_action(state_tensor, deterministic=deterministic)
         return action, log_prob.item(), value.item()
     
     def compute_gae(

@@ -10,16 +10,18 @@ import numpy as np
 import torch
 
 from src.meis_env import MEISEnv
+from src.complex_meis_env import ComplexMEISEnv
 from src.a3c_agent import A3CAgent
 from src.trainer import Trainer
 from src.s_s_policy import sSPolicy, sSPolicyTuner
 from utils.evaluation import compare_policies, evaluate_agent
-from utils.helpers import ( 
+from utils.helpers import (
     print_eval_res,
-    _load_config, 
+    _get_complex_meis_env,
+    _load_config,
     _read_metrics,
-    _setup_directory, 
-    _save_config
+    _setup_directory,
+    _save_config,
 )
 from utils.visualisation import (
     plot_training_curves, 
@@ -37,12 +39,28 @@ def main(args):
     np.random.seed(seed_val)
     torch.manual_seed(seed_val)
 
-    path_to_dir = config['general']['save_dir']
+    # Scope save_dir per env so Env-1 artifacts are never clobbered.
+    base_save_dir = config['general']['save_dir']
+    env_name = args.env
+    if env_name == 'meis':
+        path_to_dir = base_save_dir
+    else:
+        path_to_dir = f"{base_save_dir.rstrip('/\\')}_{env_name}"
     dirs = _setup_directory(path_to_dir)
     _save_config(
         config_path=os.path.join(dirs['logs'], 'config.json'),
         content=config
     )
+
+    # Pre-bind all artifact paths so every mode can reference them without
+    # the plot branch NameError-ing when eval was run in a separate process.
+    checkpoint_path = os.path.join(dirs['checkpoints'], 'checkpoint_final.pt')
+    best_model_path = os.path.join(dirs['checkpoints'], 'best_model.pt')
+    params_path = os.path.join(dirs['logs'], 'baseline_params.json')
+    rl_metrics_path = os.path.join(dirs['eval'], 'rl_metrics.json')
+    baseline_metrics_path = os.path.join(dirs['eval'], 'baseline_metrics.json')
+    eval_res_path = os.path.join(dirs['logs'], 'evaluation_results.json')
+    history_path = os.path.join(dirs['checkpoints'], 'training_history.json')
 
     print("\n" + "="*60)
     print("MULTI-ECHELON INVENTORY SYSTEM - A3C TRAINING")
@@ -53,7 +71,10 @@ def main(args):
 
     # Create environment
     print("\n--- Creating Environment ---")
-    env = MEISEnv()
+    if env_name == 'complex':
+        env = ComplexMEISEnv(config=_get_complex_meis_env())
+    else:
+        env = MEISEnv()
     print(f"State dimension: {env.observation_space.shape[0]}")
     print(f"Action dimension: {env.action_space.n}")
 
@@ -68,17 +89,25 @@ def main(args):
     print(f"Network architecture: {agent_config['n_layers']} layers, {agent_config['hidden_size']} neurons")
     print(f"Learning rate: {agent_config['lr']}")
 
-    # Create and tune baseline policy
+    # Create and tune baseline policy. Tuning is expensive
+    # (differential_evolution over tuning_maxiter * tuning_episodes rollouts),
+    # so reuse cached params whenever available. Train mode always retunes so
+    # the training run is self-contained and reproducible.
     print("\n--- Creating Baseline Policy ---")
-    print("Tuning (s,S) policy parameters...")
-    tuner = sSPolicyTuner(
-        env,
-        n_eval_episodes=config['baseline']['tuning_episodes']
-    )
-    best_params, _ = tuner.tune(
-        maxiter=config['baseline']['tuning_maxiter'],
-        seed=seed_val
-    )
+    cached = _read_metrics(metrics_path=params_path) if args.mode != 'train' else None
+    if cached is not None:
+        print(f"Loaded cached (s,S) parameters from: {params_path}")
+        best_params = cached
+    else:
+        print("Tuning (s,S) policy parameters...")
+        tuner = sSPolicyTuner(
+            env,
+            n_eval_episodes=config['baseline']['tuning_episodes']
+        )
+        best_params, _ = tuner.tune(
+            maxiter=config['baseline']['tuning_maxiter'],
+            seed=seed_val
+        )
     baseline_policy = sSPolicy(best_params)
 
     # train model
@@ -92,16 +121,11 @@ def main(args):
         ).train()
     # evaluate performance
     elif args.mode == 'eval':
-        checkpoint_path = os.path.join(dirs['checkpoints'], 'checkpoint_final.pt')
-        params_path = os.path.join(dirs['logs'], 'baseline_params.json')
-        rl_metrics_path = os.path.join(dirs['eval'], 'rl_metrics.json')
-        baseline_metrics_path = os.path.join(dirs['eval'], 'baseline_metrics.json')
-        eval_res_path = os.path.join(dirs['logs'], 'evaluation_results.json')
-        
         print("\n--- Loading Pre-trained Agent ---")
-        agent.load(checkpoint_path)
-        print(f"Loaded checkpoint from: {checkpoint_path}")
-        
+        if os.path.exists(checkpoint_path):
+            agent.load(checkpoint_path)
+            print(f"Loaded checkpoint from: {checkpoint_path}")
+
         # Save tuned parameters
         _save_config(config_path=params_path, content=best_params)
         print(f"Baseline parameters saved to: {params_path}")
@@ -109,7 +133,6 @@ def main(args):
         # Evaluate both policies
         print("\n--- Evaluating Policies ---")
         print("Evaluating A3C agent...")
-        best_model_path = os.path.join(dirs['checkpoints'], 'best_model.pt')
         agent.load(best_model_path)
         rl_metrics = evaluate_agent(
             env,
@@ -153,7 +176,6 @@ def main(args):
         print(f"\nEvaluation results saved to: {eval_res_path}")
     # visualise results
     else:
-        history_path = os.path.join(dirs['checkpoints'], 'training_history.json')
         training_history = _read_metrics(metrics_path=history_path)
 
         if training_history is None:
@@ -206,6 +228,13 @@ if __name__ == "__main__":
         default='train',
         choices=['train', 'eval', 'plot'],
         help='Mode: train, eval, or plot'
+    )
+    parser.add_argument(
+        '--env',
+        type=str,
+        default='meis',
+        choices=['meis', 'complex'],
+        help='Environment variant: original MEIS (Env-1) or complex MEIS (Env-2)'
     )
     args = parser.parse_args()
     main(args)

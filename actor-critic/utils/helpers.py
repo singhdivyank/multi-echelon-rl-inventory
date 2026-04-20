@@ -16,6 +16,10 @@ def _get_meis_env() -> Dict:
     with open('./configs/meisConfig.yaml', 'r') as f:
         return yaml.safe_load(f)
 
+def _get_complex_meis_env() -> Dict:
+    with open('./configs/complexMeisConfig.yaml', 'r') as f:
+        return yaml.safe_load(f)
+
 def _save_config(config_path: str, content: Dict):
     """Save training config as JSON"""
 

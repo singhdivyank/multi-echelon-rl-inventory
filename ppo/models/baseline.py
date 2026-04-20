@@ -19,7 +19,11 @@ class BaselineAgent:
     def __init__(self, env):
         self.env = env
         self.state_dim = env.observation_space.shape[0]
-        self.action_dim = env.observation_space.shape[0]
+        # Pre-existing bug: this used to be `observation_space.shape[0]` (the
+        # state dim, 11), so the baseline returned 11-d actions of which only
+        # the first 4 were actually consumed by the env. Fix to the real
+        # action space so the (s,S) heuristic is evaluated correctly.
+        self.action_dim = env.action_space.shape[0]
         self._init_base_stock_levels()
         self.episode_costs = []
         self.episode_rewards = []
@@ -33,10 +37,19 @@ class BaselineAgent:
             - Safety stock = z * sqrt(lead_time) * std(demand)
         """
 
-        avg_demand = self.env.lambda_w_r
-        avg_lead_time = self.env.lead_time
+        # Use complex-env effective demand when available, else fall back to
+        # the original divergent env's lambda_w_r.
+        if hasattr(self.env, 'demand_base'):
+            peak_mult = 1.0 + getattr(self.env, 'demand_amplitude', 0.0)
+            avg_demand = float(self.env.demand_base) * peak_mult
+            std_demand = float(getattr(self.env, 'demand_noise_std', 1.0))
+            avg_lead_time = float(getattr(self.env, 'lead_time_mean', self.env.lead_time))
+        else:
+            avg_demand = self.env.lambda_w_r
+            std_demand = np.sqrt(max(1.0, avg_demand))
+            avg_lead_time = self.env.lead_time
         z_score = 1.65
-        safety_stock = z_score * np.sqrt(avg_demand) * np.sqrt(avg_lead_time)
+        safety_stock = z_score * std_demand * np.sqrt(max(1.0, avg_lead_time))
         self.base_stock_warehouse = avg_demand * avg_lead_time + safety_stock
 
         num_retailers = self.action_dim - 1
@@ -139,16 +152,22 @@ class BaselineAgent:
         np.save(path, params)
     
     def load(self, path: str):
-        """
-        Load baseline parameters
-        
-        Args:
-            path: Load path
-        """
+        """Load baseline parameters. Refuses stale files written by the
+        pre-fix action_dim bug (where base_stock_retailers had state-dim
+        entries instead of num_retailers)."""
 
         params = np.load(path, allow_pickle=True).item()
+        loaded_retailers = np.asarray(params['base_stock_retailers'])
+        expected = self.base_stock_retailers.shape[0]
+        if loaded_retailers.shape[0] != expected:
+            print(
+                f"[BaselineAgent.load] Ignoring stale checkpoint {path}: "
+                f"retailer base-stock shape {loaded_retailers.shape} != "
+                f"expected ({expected},). Using freshly-initialized params."
+            )
+            return
         self.base_stock_warehouse = params['base_stock_warehouse']
-        self.base_stock_retailers = params['base_stock_retailers']
+        self.base_stock_retailers = loaded_retailers
     
     def get_value(self, state: np.ndarray) -> float:
         """
