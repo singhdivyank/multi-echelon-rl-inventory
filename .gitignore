@@ -31,6 +31,12 @@ docs/*.synctex.gz
 docs/*.bbl
 docs/*.blg
 
+# Unzipped AAAI-26 AuthorKit (~7 MB).  The three files we actually need
+# (aaai2026.sty, aaai2026.bst) are copied into docs/ and committed.  The
+# full kit is available from https://aaai.org/authorkit26-1/.
+AuthorKit26/
+AuthorKit26*.zip
+
 # OS artifacts
 .DS_Store
 Thumbs.db
