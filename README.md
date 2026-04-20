@@ -1,5 +1,7 @@
 # Deep Reinforcement Learning for Multi-Echelon Inventory Optimization
 
+**Repository:** <https://github.com/singhdivyank/multi-echelon-rl-inventory>
+
 ![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-1.10%2B-EE4C2C?logo=pytorch&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
@@ -60,7 +62,7 @@ single-environment evaluation of deep-RL inventory policies is not
 reliable evidence of real robustness.
 
 **Full writeup with figures, methodology, and threats to validity**:
-see the IEEE-conference-style paper at [`docs/paper.pdf`](docs/paper.pdf)
+see the AAAI-26-formatted paper at [`docs/paper.pdf`](docs/paper.pdf)
 (source: [`docs/paper.tex`](docs/paper.tex); Markdown mirror:
 [`docs/report.md`](docs/report.md)).
 
