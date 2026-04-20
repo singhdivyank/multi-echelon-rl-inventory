@@ -20,6 +20,17 @@ env/
 # Intermediate PPO periodic checkpoints (keep only best + final).
 **/ppo_divergent_iter_*.pt
 
+# LaTeX build artefacts (keep .tex and .pdf, drop everything else).
+docs/*.aux
+docs/*.out
+docs/*.log
+docs/*.toc
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.synctex.gz
+docs/*.bbl
+docs/*.blg
+
 # OS artifacts
 .DS_Store
 Thumbs.db
@@ -31,3 +42,5 @@ Thumbs.db
 
 #Poster
 Poster/
+
+AuthorKit26/

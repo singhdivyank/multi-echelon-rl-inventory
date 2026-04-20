@@ -60,7 +60,9 @@ single-environment evaluation of deep-RL inventory policies is not
 reliable evidence of real robustness.
 
 **Full writeup with figures, methodology, and threats to validity**:
-see [`docs/report.md`](docs/report.md).
+see the IEEE-conference-style paper at [`docs/paper.pdf`](docs/paper.pdf)
+(source: [`docs/paper.tex`](docs/paper.tex); Markdown mirror:
+[`docs/report.md`](docs/report.md)).
 
 # Project Structure
 
@@ -159,6 +161,7 @@ From the repo root:
 ``` bash
 python scripts/smoke_env.py     # end-to-end sanity check for all 4 (algo, env) combos
 python scripts/make_report.py   # rebuild docs/report.md + figures from saved JSONs
+python scripts/build_paper.py   # rebuild docs/paper.pdf from docs/paper.tex (needs pdflatex)
 ```
 
 # Platform Independence
