@@ -1,7 +1,7 @@
 %File: paper.tex
 %release: 2026.1
 %
-% Final project report, CS 5100 -- Foundations of AI.
+% Final project report, CS 5180 -- Reinforcement Learning and Sequential Decision Making.
 % Formatted using the official AAAI 2026 author kit (aaai2026.sty).
 % Build: python scripts/build_paper.py
 
@@ -54,7 +54,7 @@
 }
 \affiliations{
     Khoury College of Computer Sciences, Northeastern University\\
-    CS~5100 -- Foundations of Artificial Intelligence\\
+    CS~5180 -- Reinforcement Learning and Sequential Decision Making\\
     singh.divya@northeastern.edu, biswas.is@northeastern.edu
 }
 
@@ -89,68 +89,115 @@ variant and an equivalently-tuned baseline should accompany any
 deep-RL inventory result.
 \end{abstract}
 
+% Clickable URL without the hyperref package (which aaai2026.sty forbids).
+% Uses pdfTeX's built-in link annotation primitives directly.
 \begin{links}
-    \link{Code}{https://github.com/singhdivyank/multi-echelon-rl-inventory}
+  \par\textbf{Code} ---
+  \pdfstartlink attr{/Border [0 0 0]} user{%
+    /Subtype /Link /A << /Type /Action /S /URI
+    /URI (https://github.com/singhdivyank/multi-echelon-rl-inventory) >>}%
+  \url{https://github.com/singhdivyank/multi-echelon-rl-inventory}%
+  \pdfendlink
 \end{links}
 
 % -----------------------------------------------------------------
 \section{Introduction}
 % -----------------------------------------------------------------
-Multi-echelon inventory control is a canonical operations-research
-problem: given stochastic demand at several retail nodes, finite
-and noisy lead times between nodes, and per-echelon holding,
-backorder and ordering costs, pick a replenishment policy that
-minimises long-run expected cost while preserving a service level.
-Classical OR gives two well-studied policies for this setting.  The
-echelon base-stock policy and the $(s,S)$ reorder-point policy are
-both known to be optimal under stationary, i.i.d.\ demand and, for
-$(s,S)$, fixed ordering cost \citep{clark1960optimal}.  Both become
-systematically wrong once demand is non-stationary, shocks are
-present, or lead times are heavy-tailed, because their set-points
-are calibrated against the \emph{mean} demand-over-lead-time.
+The operation of supply chains is a first-order cost driver for any
+manufacturing firm.  Inventory alone accounts for
+\SIrange{20}{60}{\percent} of the total assets of a typical
+manufacturing company \citep{unyimadu2014inventory}, and inventory
+management is the discipline that decides how much stock to hold
+at every tier of the chain so that demand is met at minimum cost.
+Formally, the objective is to minimise the expected cumulative
+operating cost
+\begin{equation}
+\min\;
+\mathbb{E}\!\left[\,\sum_{t=0}^{T-1}\!
+    \big(C^{\text{hold}}_t + C^{\text{back}}_t + C^{\text{ord}}_t\big)
+\right],
+\label{eq:intro-obj}
+\end{equation}
+where $C^{\text{hold}}$ is the cost of storing unsold inventory,
+$C^{\text{back}}$ is the penalty paid whenever demand cannot be
+served from stock, and $C^{\text{ord}}$ is the fixed-plus-variable
+cost of placing a replenishment order.  A Multi-Echelon Inventory
+System (MEIS) optimises this objective jointly across several tiers
+--- suppliers, manufacturers, warehouses and retailers --- rather
+than each tier in isolation, which is where the problem becomes
+operationally hard: a locally-sensible decision at one echelon can
+amplify cost at another.
 
-Deep reinforcement learning (RL) has been proposed as a learned
-alternative that can, in principle, adapt to any dynamics the MDP
-can express.  The recent literature
-\citep{oroojlooyjadid2022deep,gijsbrechts2022can} reports substantial
-RL wins --- often \SIrange{10}{40}{\percent} --- over OR heuristics.
-However, these comparisons are almost always reported on a single
-hand-crafted environment, against a baseline whose parameters are
-not re-tuned to that environment.  It is then unclear how much of
-the reported gap is the RL policy being genuinely better and how
-much is the heuristic being unfairly handicapped on an environment
-it already solves well.
+Classical OR answers this with two well-studied policies.  The
+echelon base-stock policy and the $(s,S)$ reorder-point policy are
+optimal under strict stationarity, i.i.d.\ demand and (for
+$(s,S)$) fixed ordering cost \citep{clark1960optimal}.
+Meta-heuristic extensions such as genetic algorithms
+\citep{grahl2016meta} give decent local optima on richer instances
+but carry two disadvantages: they make no optimality guarantee and
+they degrade when the chain structure or dynamics change.  In
+practice both classes become systematically wrong once demand is
+non-stationary, shocks are present or lead times are heavy-tailed,
+because their set-points are calibrated against the \emph{mean}
+demand-over-lead-time.
+
+Deep reinforcement learning (RL) \citep{sutton2018temporal} is
+attractive for exactly this reason: a learned policy can, in
+principle, adapt to any dynamics the MDP can express.  The recent
+literature \citep{oroojlooyjadid2022deep,gijsbrechts2022can,geevers2024multi,hammler2022multi}
+reports substantial RL wins --- often \SIrange{10}{40}{\percent}
+--- over OR heuristics.  However, these comparisons are almost
+always reported on a single hand-crafted environment, against a
+baseline whose parameters are not re-tuned to that environment.
+It is then unclear how much of the reported gap is the RL policy
+being genuinely better and how much is the heuristic being
+unfairly handicapped on an environment it already solves well.
 
 Our course project trained one policy-gradient agent per algorithm
 (PPO, A3C) on one environment each (a divergent supply chain, a
-3-node MEIS chain).  A reviewer on our poster presentation raised
+4-node MEIS chain).  A reviewer on our poster presentation raised
 the single-environment concern above and asked us to show that the
 wins hold on a second, harder environment.  This paper is our
-response.  Concretely:
+response.  Concretely, we make three contributions:
 \begin{enumerate}
-\item We design a non-stationary second environment (Env-2) per
+\item \emph{Continuous-action formulation.}  We solve the PPO
+      variant with a fully continuous $4$-dimensional action head
+      (order quantity per echelon), rather than the discretised
+      grids used by most of the prior literature.
+\item \emph{Explicit backorder accounting.}  Both environments
+      track unfulfilled demand as an aged, age-bucketed backlog,
+      and fold it back into the cost signal --- so the RL agent
+      is penalised for the same shortages that classical OR
+      treats as a first-class citizen.
+\item \emph{Transferable baseline under distribution shift.}  We
+      design a non-stationary second environment (Env-2) per
       benchmark that introduces seasonal demand, cross-retailer
       correlation, rare multiplicative demand shocks, heavy-tailed
       stochastic lead times, stochastic supplier / outbound
-      capacity caps, and partial lost sales, while keeping the
-      observation and action spaces unchanged --- so that the
-      agent code transfers with zero modification.
-\item We re-train PPO and A3C on their respective Env-2 with the
-      same hyperparameters that produced the Env-1 results, and
-      evaluate with the same protocol.
-\item We report one positive transfer result (PPO, whose relative
-      advantage over a fixed analytical baseline widens on Env-2)
-      and one negative transfer result (A3C, whose narrow win over
-      a retuned $(s,S)$ baseline on Env-1 flips into a decisive
-      loss on Env-2).
+      capacity caps and partial lost sales --- while keeping the
+      observation and action spaces of Env-1 unchanged.  The agent
+      code transfers with zero modification, and the same PPO /
+      A3C hyperparameters used on Env-1 are re-used on Env-2 so
+      that differences in reported cost reflect dynamics, not
+      tuning effort.
 \end{enumerate}
-The broader point is that the sign of a deep-RL-vs-heuristic
-comparison depends sensitively on both the environment and how
-hard the baseline is tuned; single-env results are not robust
-evidence.
+With this harness in place, we report one positive transfer result
+(PPO, whose relative advantage over a fixed analytical baseline
+widens on Env-2) and one negative transfer result (A3C, whose
+narrow win over a retuned $(s,S)$ baseline on Env-1 flips into a
+decisive loss on Env-2).  The broader point is that the sign of a
+deep-RL-vs-heuristic comparison depends sensitively on both the
+environment and how hard the baseline is tuned; single-env results
+are not robust evidence.  The remainder of the paper is structured
+as follows: Section~\ref{sec:bg} develops the MDP, the DRL
+algorithms and the OR baselines; Section~\ref{sec:rel} surveys
+related work; Section~\ref{sec:proj} describes the two
+environments formally; Section~\ref{sec:exp} reports the four
+evaluation cells; Section~\ref{sec:conc} concludes.
 
 % -----------------------------------------------------------------
 \section{Background}
+\label{sec:bg}
 % -----------------------------------------------------------------
 
 \subsection{The Multi-Echelon Inventory MDP}
@@ -221,25 +268,53 @@ size-64 minibatches using the clipped objective
 \end{equation}
 with
 $r_t(\theta)=\pi_\theta(a_t\mid s_t)/\pi_{\theta_{\text{old}}}(a_t\mid s_t)$
-and $\varepsilon{=}0.2$.  The combined loss adds a clipped
-value-loss term and a small entropy bonus.
+and $\varepsilon{=}0.2$.  The full PPO objective combines the
+clipped surrogate with a squared-error value loss and an entropy
+bonus that keeps the policy stochastic:
+\begin{equation}
+\mathcal{L}^{\text{VF}}=\mathbb{E}_t\!\big[(V_\phi(s_t)-R_t)^2\big],\;
+\mathcal{L}^{\text{ENT}}=\mathbb{E}_t\!\big[\mathcal{H}[\pi_\theta(\cdot\mid s_t)]\big],
+\label{eq:ppovfent}
+\end{equation}
+\begin{equation}
+\mathcal{L}(\theta,\phi)
+   = \mathcal{L}^{\text{CLIP}}
+   - c_1\,\mathcal{L}^{\text{VF}}
+   + c_2\,\mathcal{L}^{\text{ENT}}.
+\label{eq:ppototal}
+\end{equation}
+Advantages are computed via Generalized Advantage Estimation
+\citep{schulman2016gae}, which blends single-step TD residuals
+$\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)$ into a
+low-variance multi-step estimate
+$\hat A_t = \sum_{l=0}^{\infty}(\gamma\lambda)^l\,\delta_{t+l}$.
 
 \subsubsection{A3C}
-We use a synchronous single-worker variant of A3C
-\citep{mnih2016a3c} on the discrete-action MEIS benchmark.  The
-actor emits a softmax over $|\mathcal{A}|{=}13$ actions, the critic
-emits a scalar value, and the policy gradient is $n$-step-advantage
+The original A3C algorithm \citep{mnih2016a3c} spawns several
+actor-learners that each interact with their own copy of the
+environment and push asynchronous gradient updates to a shared set
+of parameters; this is the ``asynchronous'' in the name.  Because
+the MEIS episodes here are short (\num{365} steps) and the
+bottleneck is environment simulation rather than gradient compute,
+we use a synchronous single-worker variant, which yields identical
+learning dynamics without the cross-process complexity.  The actor
+emits a softmax over $|\mathcal{A}|{=}13$ actions, the critic emits
+a scalar value, and the policy gradient is $n$-step-advantage
 based:
 \begin{equation}
 \begin{aligned}
 \nabla_\theta J \approx\,
   \mathbb{E}_t\big[&\nabla_\theta\log\pi_\theta(a_t\mid s_t)\,\hat A_t\big]\\
-  &+\,\beta\,\nabla_\theta \mathcal{H}[\pi_\theta(\cdot\mid s_t)],
+  &+\,\beta\,\nabla_\theta \mathcal{H}[\pi_\theta(\cdot\mid s_t)].
 \end{aligned}
 \label{eq:a3cpg}
 \end{equation}
-with an entropy regulariser of weight $\beta$ and gradient clipping
-at $\|\nabla\|{=}0.5$.
+The entropy term $\mathcal{H}[\pi_\theta(\cdot\mid s_t)]$ weighted
+by $\beta$ acts as a regulariser that keeps the action
+distribution from collapsing prematurely onto a bad local optimum,
+which is especially important on the long-horizon inventory tasks
+where the early-training gradient is dominated by a few expensive
+backorder events.  Gradients are clipped at $\|\nabla\|{=}0.5$.
 
 \subsection{Significance Testing}
 Because each evaluation cell produces hundreds of per-episode costs,
@@ -253,30 +328,50 @@ significance from the non-overlap of the $95\%$ CIs.
 
 % -----------------------------------------------------------------
 \section{Related Work}
+\label{sec:rel}
 % -----------------------------------------------------------------
 
-\subsubsection{Classical Multi-Echelon Inventory}
+\subsubsection{Classical and Meta-Heuristic Methods}
 The Clark--Scarf decomposition \citep{clark1960optimal} establishes
 optimality of echelon base-stock under strict stationarity,
-i.i.d.\ demand, and backlog dynamics.  Axs\"ater's textbook
-\citep{axsater2015inventory} extends to Poisson and
-compound-Poisson demand and capacitated systems.  We could have
-used echelon base-stock or $(s,S)$ directly as the method under
-study and reported tuning quality rather than RL.  We did not,
-because the explicit goal of the project was to study
-reinforcement learning as an \emph{alternative} to classical OR
-on multi-echelon supply chains; the OR methods play the role of
-baselines to beat, not the method under study.
+i.i.d.\ demand and backlog dynamics, and remains the reference
+point for tractable multi-echelon policies.  Meta-heuristics such
+as genetic algorithms \citep{grahl2016meta} extend this to richer
+instances --- differentiated service times, non-trivial topology
+--- but without an optimality guarantee and with sensitivity to
+structural changes in the chain.  We use an echelon base-stock
+policy (PPO baseline) and a differential-evolution-tuned $(s,S)$
+policy (A3C baseline) as direct descendants of these two lines,
+and treat them as targets to beat rather than methods under study.
+
+\subsubsection{Deep RL for Multi-Echelon Inventory}
+\citet{geevers2024multi} train PPO on a divergent MEIS with
+stochastic demand and compare against an $(s,S)$ heuristic; we
+follow their problem formulation closely on the PPO side, with two
+modifications: (i) a continuous rather than discretised action
+head, and (ii) an explicit Env-2 with seasonal / correlated /
+shock dynamics for out-of-distribution evaluation.
+\citet{hammler2022multi} train an A3C variant on a related MEIS
+setting; our A3C pipeline inherits their discretised-action design
+(13 reorder combinations) but again re-evaluates the trained
+policy on a harder Env-2 rather than the stationary single
+environment they report.  \citet{lu2025dynamic} train a
+deep-RL policy on a supply chain with explicitly \emph{disruptive}
+scenarios (supplier shocks, lead-time spikes) and report
+double-digit improvements over classical baselines; their results
+help explain why our PPO agent's \emph{relative} advantage over a
+fixed base-stock widens on Env-2 --- the stressors Env-2 injects
+are exactly the ones classical OR is ill-equipped to handle.
 
 \subsubsection{Value-Based RL for Inventory}
 \citet{oroojlooyjadid2022deep} apply deep Q-learning to the beer
 game.  We could have used DQN instead of A3C on the MEIS benchmark
 (the A3C action space is already discrete), but DQN is off-policy
 and sample-inefficient on long-horizon inventory rollouts with
-dense reward signals; actor-critic methods are the standard
-modern choice for this problem shape, and using actor-critic for
-both algorithms lets us keep a single unified (actor, critic)
-code base.
+dense reward signals; actor-critic methods are the standard modern
+choice for this problem shape, and using actor-critic for both
+algorithms lets us keep a single unified (actor, critic) code
+base.
 
 \subsubsection{Policy-Gradient RL for Inventory}
 \citet{gijsbrechts2022can} benchmark A3C, PPO and VPG across
@@ -287,19 +382,21 @@ they present, but introduces a second environment in the
 evaluation and reports paired results per algorithm.
 
 \subsubsection{Robust and Distributionally-Robust RL}
-Work on CVaR-PPO and distributionally-robust policy gradients could
-directly address the right-tail failures we observe for PPO on
-Env-2 (Section~\ref{sec:exp}).  We chose vanilla PPO and A3C
+Work on CVaR-PPO and distributionally-robust policy gradients
+could directly address the right-tail failures we observe for PPO
+on Env-2 (Section~\ref{sec:exp}).  We chose vanilla PPO and A3C
 because the course assignment specifies the standard algorithms
 and because using a non-vanilla RL method would confound the
 environment comparison with the algorithmic comparison.
 
 \subsubsection{Robustness Benchmarks Outside Inventory}
-Meta-World \citep{yu2020metaworld} and Procgen
-\citep{cobbe2020procgen} argue, outside inventory control, that
-single-environment RL wins are not reliable evidence of
-generalisation.  Our paper makes the same methodological argument
-specific to the OR-flavoured inventory setting.
+Procgen \citep{cobbe2020procgen} argues, outside inventory
+control, that single-environment RL wins are not reliable evidence
+of generalisation: an agent that wins on a hand-crafted level can
+collapse on procedurally-sampled levels with identical observation
+and action spaces.  Our paper makes the same methodological
+argument specific to the OR-flavoured inventory setting, with
+Env-2 as the ``procedural'' counterpart to Env-1.
 
 % -----------------------------------------------------------------
 \section{Project Description}
@@ -324,12 +421,12 @@ order quantities (one per echelon).  Episodes last $T{=}500$ steps
 with a 100-step warm-up.
 
 \subsubsection{A3C / MEIS}
-A 3-node divergent multi-echelon inventory system (MEIS): factory
-(capacity $\infty$), one middle warehouse, two leaf retailers.
-Leaf demand is Gaussian $\mathcal{N}(3300,100)$; lead times are
-Gaussian $\mathcal{N}(\mu{=}2,\sigma{=}1)$ rounded to days.
-Backlog has a fixed 5-day expiry: demand older than 5 days is
-lost and incurs a shortage penalty.  The action space is discrete
+A 4-node divergent multi-echelon inventory system (MEIS): one
+factory (capacity $\infty$), one middle warehouse, and two leaf
+retailers.  Leaf demand is Gaussian $\mathcal{N}(3300,100)$; lead
+times are Gaussian $\mathcal{N}(\mu{=}2,\sigma{=}1)$ rounded to
+days.  Backlog has a fixed 7-day expiry: demand older than 7 days
+is lost and incurs a shortage penalty.  The action space is discrete
 (13 actions: ``do nothing'' and $4{\times}3{=}12$ fixed reorder
 combinations).  Episodes last $T{=}365$ steps.
 
@@ -386,13 +483,13 @@ Env-2 per algorithm).}
 \textbf{Hyperparameter}       & \textbf{PPO}              & \textbf{A3C}              \\
 \midrule
 Iters / episodes              & \num{5000}                & \num{10000}               \\
-Hidden layers $\times$ width  & $2\times 64$ ($\tanh$)    & $2\times 128$ (ReLU)      \\
+Hidden layers $\times$ width  & $2\times 64$ ($\tanh$)    & $3\times 64$ (ReLU)       \\
 Discount $\gamma$             & $0.95$                    & $0.99$                    \\
-GAE $\lambda$                 & $0.95$                    & n/a                       \\
+GAE $\lambda$                 & $0.95$                    & $0.95$                    \\
 Clip $\varepsilon$            & $0.2$                     & n/a                       \\
 Learning rate                 & $3{\times}10^{-4}$        & $1{\times}10^{-4}$        \\
 Rollout / batch               & $512\,/\,64$              & per-episode               \\
-Entropy coef.\ $\beta$        & $5{\times}10^{-3}$        & $10^{-2}$                 \\
+Entropy coef.\ $\beta$        & $5{\times}10^{-3}$        & $10^{-3}$                 \\
 Value-loss coef.              & $0.25$                    & $0.5$                     \\
 Grad.\ clip $\|\nabla\|$      & $0.5$                     & $0.5$                     \\
 Eval episodes                 & $100$                     & $1000$                    \\
@@ -481,7 +578,7 @@ Figure~\ref{fig:train-ppo} and Figure~\ref{fig:train-a3c} show
 per-episode training cost (light) and a rolling mean (bold) for
 each cell.
 
-\begin{figure*}[t]
+\begin{figure*}[tbp]
 \centering
 \includegraphics[width=0.95\textwidth]{training_curves_ppo.png}
 \caption{PPO training cost on Env-1 (left) and Env-2 (right).
@@ -494,7 +591,7 @@ rare-but-costly shock regime.}
 \label{fig:train-ppo}
 \end{figure*}
 
-\begin{figure*}[t]
+\begin{figure*}[tbp]
 \centering
 \includegraphics[width=0.95\textwidth]{training_curves_a3c.png}
 \caption{A3C training cost on Env-1 (left) and Env-2 (right).
@@ -539,7 +636,7 @@ margin would compress.  And even against the fixed baseline, a
 CVaR-weighted evaluation would flag PPO's Env-2 right tail as an
 unresolved risk.
 
-\begin{figure*}[t]
+\begin{figure*}[tbp]
 \centering
 \includegraphics[width=0.85\textwidth]{cost_bars.png}
 \caption{Mean episode cost (lower is better).  Error bars are one
@@ -550,7 +647,7 @@ within-cell RL vs.\ baseline gap is interpretable.}
 \label{fig:costbars}
 \end{figure*}
 
-\begin{figure}[t]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.98\columnwidth]{ppo_complex_cost_hist.png}
 \caption{PPO Env-2 per-episode cost distribution (100 episodes).
@@ -573,7 +670,7 @@ entirely to the left of the A3C distribution --- stochastic
 dominance in favour of the heuristic.  Figure~\ref{fig:svc} shows
 the same effect on service level.
 
-\begin{figure}[t]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.98\columnwidth]{a3c_complex_cost_hist.png}
 \caption{A3C Env-2 per-episode cost distribution (1000 episodes).
@@ -583,7 +680,7 @@ budget, A3C is stochastically dominated by the retuned heuristic.}
 \label{fig:a3c-hist}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.98\columnwidth]{service_level_bars.png}
 \caption{A3C service level on Env-1 and Env-2.  On Env-2, A3C is
@@ -653,11 +750,12 @@ absolute-cost comparisons are not meaningful.
 
 % -----------------------------------------------------------------
 \section{Conclusion}
+\label{sec:conc}
 % -----------------------------------------------------------------
 
 \subsection{Summary of Results}
 We trained one PPO agent on a divergent inventory environment and
-one A3C agent on a 3-node MEIS environment under standard
+one A3C agent on a 4-node MEIS environment under standard
 conditions (Env-1), then re-trained both under identical
 hyperparameters on a second, non-stationary environment (Env-2)
 with the same observation and action spaces.  Against a fixed
@@ -701,26 +799,49 @@ own right, for a fairer per-env comparison.
 % -----------------------------------------------------------------
 % Inline bibliography (single-file source, per AAAI rules).
 % -----------------------------------------------------------------
+% -----------------------------------------------------------------
+\section*{Acronyms}
+% -----------------------------------------------------------------
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[A3C] Asynchronous Advantage Actor-Critic
+\item[CI]  Confidence Interval
+\item[CVaR] Conditional Value-at-Risk
+\item[DRL] Deep Reinforcement Learning
+\item[GAE] Generalized Advantage Estimation
+\item[IP]  Inventory Position
+\item[MDP] Markov Decision Process
+\item[MEIS] Multi-Echelon Inventory System
+\item[MLP] Multi-Layer Perceptron
+\item[OR]  Operations Research
+\item[PPO] Proximal Policy Optimization
+\item[RL]  Reinforcement Learning
+\item[$(s,S)$] Reorder-point / order-up-to policy
+\item[SL]  Service Level
+\end{description}
+
 \begin{thebibliography}{10}
 \providecommand{\natexlab}[1]{#1}
 
-\bibitem[{Axs\"ater(2015)}]{axsater2015inventory}
-Axs\"ater, S. 2015.
-\newblock \emph{Inventory Control}, 3rd ed.
-\newblock Springer.
-
-\bibitem[{Clark and Scarf(1960)}]{clark1960optimal}
+\bibitem[Clark and Scarf(1960)]{clark1960optimal}
 Clark, A.~J.; and Scarf, H. 1960.
 \newblock Optimal Policies for a Multi-Echelon Inventory Problem.
 \newblock \emph{Management Science}, 6(4): 475--490.
 
-\bibitem[{Cobbe et~al.(2020)}]{cobbe2020procgen}
+\bibitem[Cobbe et~al.(2020)]{cobbe2020procgen}
 Cobbe, K.; Hesse, C.; Hilton, J.; and Schulman, J. 2020.
 \newblock Leveraging Procedural Generation to Benchmark
 Reinforcement Learning.
 \newblock In \emph{ICML}.
 
-\bibitem[{Gijsbrechts et~al.(2022)}]{gijsbrechts2022can}
+\bibitem[Geevers et~al.(2024)]{geevers2024multi}
+Geevers, K.; Van~Hezewijk, L.; and Mes, M.~R.~K. 2024.
+\newblock Multi-Echelon Inventory Optimization Using Deep
+Reinforcement Learning.
+\newblock \emph{Central European Journal of Operations Research},
+32(3): 653--683.
+
+\bibitem[Gijsbrechts et~al.(2022)]{gijsbrechts2022can}
 Gijsbrechts, J.; Boute, R.~N.; Van Mieghem, J.; and Zhang, D. 2022.
 \newblock Can Deep Reinforcement Learning Improve Inventory
 Management?  Performance on Lost Sales, Dual-Sourcing, and
@@ -728,12 +849,32 @@ Multi-Echelon Problems.
 \newblock \emph{Manufacturing \& Service Operations Management},
 24(3).
 
-\bibitem[{Mnih et~al.(2016)}]{mnih2016a3c}
+\bibitem[Grahl et~al.(2016)]{grahl2016meta}
+Grahl, J.; Minner, S.; and Dittmar, D. 2016.
+\newblock Meta-Heuristics for Placing Strategic Safety Stock in
+Multi-Echelon Inventory with Differentiated Service Times.
+\newblock \emph{Annals of Operations Research}, 242(2): 489--504.
+
+\bibitem[Hammler et~al.(2022)]{hammler2022multi}
+Hammler, P.; Riesterer, N.; Mu, G.; and Braun, T. 2022.
+\newblock Multi-Echelon Inventory Optimization Using Deep
+Reinforcement Learning.
+\newblock In \emph{Quantitative Models in Life Science Business:
+From Value Creation to Business Processes}, 73--93. Springer.
+
+\bibitem[Lu et~al.(2025)]{lu2025dynamic}
+Lu, X.; Wang, H.; Peng, Z.; Liao, C.; and Liu, C. 2025.
+\newblock Dynamic Optimization of Multi-Echelon Supply Chain
+Inventory Policies Under Disruptive Scenarios: A Deep
+Reinforcement Learning Approach.
+\newblock \emph{Symmetry}, 17(12): 2078.
+
+\bibitem[Mnih et~al.(2016)]{mnih2016a3c}
 Mnih, V.; et~al. 2016.
 \newblock Asynchronous Methods for Deep Reinforcement Learning.
 \newblock In \emph{ICML}.
 
-\bibitem[{Oroojlooyjadid et~al.(2022)}]{oroojlooyjadid2022deep}
+\bibitem[Oroojlooyjadid et~al.(2022)]{oroojlooyjadid2022deep}
 Oroojlooyjadid, A.; Nazari, M.; Snyder, L.~V.; and Tak\'a\v{c}, M.
 2022.
 \newblock A Deep Q-Network for the Beer Game: Deep Reinforcement
@@ -741,30 +882,35 @@ Learning for Inventory Optimization.
 \newblock \emph{Manufacturing \& Service Operations Management},
 24(1).
 
-\bibitem[{Schulman et~al.(2016)}]{schulman2016gae}
+\bibitem[Schulman et~al.(2016)]{schulman2016gae}
 Schulman, J.; Moritz, P.; Levine, S.; Jordan, M.; and Abbeel, P.
 2016.
 \newblock High-Dimensional Continuous Control Using Generalized
 Advantage Estimation.
 \newblock In \emph{ICLR}.
 
-\bibitem[{Schulman et~al.(2017)}]{schulman2017proximal}
+\bibitem[Schulman et~al.(2017)]{schulman2017proximal}
 Schulman, J.; Wolski, F.; Dhariwal, P.; Radford, A.; and
 Klimov, O. 2017.
 \newblock Proximal Policy Optimization Algorithms.
 \newblock \emph{arXiv:1707.06347}.
 
-\bibitem[{Storn and Price(1997)}]{storn1997differential}
+\bibitem[Storn and Price(1997)]{storn1997differential}
 Storn, R.; and Price, K. 1997.
 \newblock Differential Evolution --- A Simple and Efficient
 Heuristic for Global Optimization over Continuous Spaces.
 \newblock \emph{Journal of Global Optimization}, 11: 341--359.
 
-\bibitem[{Yu et~al.(2020)}]{yu2020metaworld}
-Yu, T.; et~al. 2020.
-\newblock Meta-World: A Benchmark and Evaluation for Multi-Task
-and Meta Reinforcement Learning.
-\newblock In \emph{CoRL}.
+\bibitem[Sutton and Barto(2018)]{sutton2018temporal}
+Sutton, R.~S.; and Barto, A.~G. 2018.
+\newblock Temporal-Difference Learning.
+\newblock In \emph{Reinforcement Learning: An Introduction}, 2nd
+ed., 131--132. MIT Press.
+
+\bibitem[Unyimadu and Anyibuofu(2014)]{unyimadu2014inventory}
+Unyimadu, S.~O.; and Anyibuofu, K.~A. 2014.
+\newblock Inventory Management Practices in Manufacturing Firms.
+\newblock \emph{Industrial Engineering Letters}, 4(9): 40--44.
 
 \end{thebibliography}
 
