@@ -64,28 +64,24 @@
 
 \begin{abstract}
 Recent work reports that deep reinforcement-learning (RL) policies
-beat classical operations-research (OR) heuristics on multi-echelon
+beat classical Operations Research (OR) heuristics on multi-echelon
 inventory control by \SIrange{10}{40}{\percent}.  These results
 almost always come from a single hand-crafted environment paired
 with a fixed baseline, so it is unclear whether the RL agent has
-learned a genuinely better policy or the baseline is simply
+learned a genuinely better policy, or the baseline is simply
 under-fit.  We take two standard policy-gradient agents from our
 course project --- PPO on a 1-warehouse/3-retailer divergent supply
 chain and A3C on a 3-node factory/middle/leaf MEIS chain --- and
 evaluate each of them on two environments with the same observation
 and action spaces: the original stationary benchmark (Env-1) and a
-harder non-stationary variant (Env-2) we introduce here that adds
-seasonal demand, cross-retailer correlation, rare demand shocks,
-heavy-tailed stochastic lead times, stochastic supplier / outbound
-capacity caps, and partial lost sales.  Against a fixed analytical
-base-stock baseline, PPO's win grows from \SI{36.76}{\percent} on
+harder non-stationary variant (Env-2) that adds
+seasonal demand, cross-retailer correlation, stochastic lead times, supplier capacity caps, and partial lost sales.  Against a fixed analytical baseline, PPO's win grows from \SI{36.76}{\percent} on
 Env-1 to \SI{94.20}{\percent} on Env-2, because the untuned
 baseline collapses under shocks.  Against an $(s,S)$ baseline
 retuned per environment, A3C wins by \SI{1.64}{\percent} on Env-1
-but loses by \SI{21.79}{\percent} on Env-2 (Cohen's
-$d{\approx}{-}3.4$).  We conclude that a single-environment win is
+but loses by \SI{21.79}{\percent} on Env-2.  We conclude that a single-environment win is
 not robust evidence for either algorithm; a harder distributional
-variant and an equivalently-tuned baseline should accompany any
+variant and an equivalently tuned baseline should accompany any
 deep-RL inventory result.
 \end{abstract}
 
@@ -104,13 +100,10 @@ deep-RL inventory result.
 \section{Introduction}
 % -----------------------------------------------------------------
 The operation of supply chains is a first-order cost driver for any
-manufacturing firm.  Inventory alone accounts for
+manufacturing firm. Inventory is usually managed to respond to fluctuations in demand-supply, and accounts for
 \SIrange{20}{60}{\percent} of the total assets of a typical
-manufacturing company \citep{unyimadu2014inventory}, and inventory
-management is the discipline that decides how much stock to hold
-at every tier of the chain so that demand is met at minimum cost.
-Formally, the objective is to minimise the expected cumulative
-operating cost
+manufacturing company \citep{unyimadu2014inventory}. Inventory
+management is the discipline that decides how much stock to hold at every tier of the chain so that demand is met at minimum cost. Formally, the objective is to minimise the expected cumulative operating cost
 \begin{equation}
 \min\;
 \mathbb{E}\!\left[\,\sum_{t=0}^{T-1}\!
@@ -118,81 +111,37 @@ operating cost
 \right],
 \label{eq:intro-obj}
 \end{equation}
-where $C^{\text{hold}}$ is the cost of storing unsold inventory,
-$C^{\text{back}}$ is the penalty paid whenever demand cannot be
-served from stock, and $C^{\text{ord}}$ is the fixed-plus-variable
-cost of placing a replenishment order.  A Multi-Echelon Inventory
-System (MEIS) optimises this objective jointly across several tiers
---- suppliers, manufacturers, warehouses and retailers --- rather
-than each tier in isolation, which is where the problem becomes
-operationally hard: a locally-sensible decision at one echelon can
+where $C^{\text{hold}}$ is the cost of storing unsold inventory, $C^{\text{back}}$ is the penalty paid whenever demand cannot be
+served from stock, and $C^{\text{ord}}$ is the fixed-plus-variable cost of placing a replenishment order. A Multi-Echelon Inventory
+System (MEIS) optimises this objective jointly across several tiers --- suppliers, manufacturers, warehouses and retailers --- rather than each tier in isolation, which is where the problem becomes operationally hard: a locally-sensible decision at one echelon can
 amplify cost at another.
 
-Classical OR answers this with two well-studied policies.  The
-echelon base-stock policy and the $(s,S)$ reorder-point policy are
-optimal under strict stationarity, i.i.d.\ demand and (for
-$(s,S)$) fixed ordering cost \citep{clark1960optimal}.
-Meta-heuristic extensions such as genetic algorithms
-\citep{grahl2016meta} give decent local optima on richer instances
-but carry two disadvantages: they make no optimality guarantee and
-they degrade when the chain structure or dynamics change.  In
-practice both classes become systematically wrong once demand is
-non-stationary, shocks are present or lead times are heavy-tailed,
-because their set-points are calibrated against the \emph{mean}
+Classical OR answers this with two well-studied policies. The echelon base-stock policy and the $(s,S)$ reorder-point policy are
+optimal under strict stationarity, i.i.d.\ demand and (for $(s,S)$) fixed ordering cost \citep{clark1960optimal}. Meta-heuristic extensions such as genetic algorithms
+\citep{grahl2016meta} gives decent local optima on richer instances, but carries two disadvantages: i) makes no optimality guarantee, and ii) degrades when the dynamics change.  In practice, both classes become systematically wrong once demand is
+non-stationary, shocks are present, or lead times are heavy-tailed, because their set-points are calibrated against the \emph{mean}
 demand-over-lead-time.
 
-Deep reinforcement learning (RL) \citep{sutton2018temporal} is
-attractive for exactly this reason: a learned policy can, in
-principle, adapt to any dynamics the MDP can express.  The recent
-literature \citep{oroojlooyjadid2022deep,gijsbrechts2022can,geevers2024multi,hammler2022multi}
+Deep reinforcement learning (RL) \citep{sutton2018temporal} is attractive for exactly this reason: a learned policy can, in
+principle, adapt to any dynamics the MDP can express.  The recent literature \citep{oroojlooyjadid2022deep,gijsbrechts2022can,geevers2024multi,hammler2022multi}
 reports substantial RL wins --- often \SIrange{10}{40}{\percent}
---- over OR heuristics.  However, these comparisons are almost
-always reported on a single hand-crafted environment, against a
-baseline whose parameters are not re-tuned to that environment.
-It is then unclear how much of the reported gap is the RL policy
-being genuinely better and how much is the heuristic being
-unfairly handicapped on an environment it already solves well.
+--- over OR heuristics.  However, these comparisons are almost always reported on a single hand-crafted environment, against a
+baseline whose parameters are not re-tuned to that environment. It is then unclear how much of the reported gap is the RL policy
+being genuinely better and how much is the heuristic being unfairly handicapped on an environment it already solves well.
 
-Our course project trained one policy-gradient agent per algorithm
-(PPO, A3C) on one environment each (a divergent supply chain, a
-4-node MEIS chain).  A reviewer on our poster presentation raised
-the single-environment concern above and asked us to show that the
-wins hold on a second, harder environment.  This paper is our
-response.  Concretely, we make three contributions:
+Our course project trained one policy-gradient agent per algorithm (PPO, A3C) on one environment each (a divergent supply chain, a
+4-node MEIS chain).  A reviewer on our poster presentation raised the single-environment concern above and asked us to show that the
+wins hold on a second, harder environment.  This paper is our response. Concretely, we make three contributions:
 \begin{enumerate}
-\item \emph{Continuous-action formulation.}  We solve the PPO
-      variant with a fully continuous $4$-dimensional action head
-      (order quantity per echelon), rather than the discretised
-      grids used by most of the prior literature.
-\item \emph{Explicit backorder accounting.}  Both environments
-      track unfulfilled demand as an aged, age-bucketed backlog,
-      and fold it back into the cost signal --- so the RL agent
-      is penalised for the same shortages that classical OR
-      treats as a first-class citizen.
-\item \emph{Transferable baseline under distribution shift.}  We
-      design a non-stationary second environment (Env-2) per
-      benchmark that introduces seasonal demand, cross-retailer
-      correlation, rare multiplicative demand shocks, heavy-tailed
-      stochastic lead times, stochastic supplier / outbound
-      capacity caps and partial lost sales --- while keeping the
-      observation and action spaces of Env-1 unchanged.  The agent
-      code transfers with zero modification, and the same PPO /
-      A3C hyperparameters used on Env-1 are re-used on Env-2 so
-      that differences in reported cost reflect dynamics, not
-      tuning effort.
+\item \emph{Continuous-action formulation.}  We solve the PPO variant with a fully continuous $4$-dimensional action head (order quantity per echelon)
+\item \emph{Explicit backorder accounting.}  Both environments track unfulfilled demand as backlog and fold it back into the cost signal --- so the RL agent is penalised for the same shortages that classical OR treats as a first-class citizen.
+\item \emph{Transferable baseline under distribution shift.}  We design a non-stationary second environment (Env-2) per benchmark that introduces seasonal demand, cross-retailer correlation, rare multiplicative demand shocks, heavy-tailed stochastic lead times, stochastic supplier / outbound capacity caps, and partial lost sales --- while keeping the observation and action spaces of Env-1 unchanged. The agent code transfers with zero modification, and the same PPO / A3C hyperparameters are used on Env-2 as well so that differences in reported cost reflect dynamics.
 \end{enumerate}
-With this harness in place, we report one positive transfer result
-(PPO, whose relative advantage over a fixed analytical baseline
-widens on Env-2) and one negative transfer result (A3C, whose
-narrow win over a retuned $(s,S)$ baseline on Env-1 flips into a
-decisive loss on Env-2).  The broader point is that the sign of a
-deep-RL-vs-heuristic comparison depends sensitively on both the
-environment and how hard the baseline is tuned; single-env results
-are not robust evidence.  The remainder of the paper is structured
-as follows: Section~\ref{sec:bg} develops the MDP, the DRL
-algorithms and the OR baselines; Section~\ref{sec:rel} surveys
-related work; Section~\ref{sec:proj} describes the two
-environments formally; Section~\ref{sec:exp} reports the four
+With this harness in place, we report one positive transfer result (PPO, whose relative advantage over a fixed analytical baseline
+widens on Env-2) and one negative transfer result (A3C, whose narrow win over a retuned $(s,S)$ baseline on Env-1 flips into a
+decisive loss on Env-2). The broader point is that the sign of a deep-RL-vs-heuristic comparison depends sensitively on both the
+environment and how hard the baseline is tuned; single-env results are not robust evidence. The remainder of the paper is structured as follows: Section~\ref{sec:bg} develops the MDP, the DRL algorithms and the OR baselines; Section~\ref{sec:rel} surveys
+related work; Section~\ref{sec:proj} describes the two environments formally; Section~\ref{sec:exp} reports the four
 evaluation cells; Section~\ref{sec:conc} concludes.
 
 % -----------------------------------------------------------------
