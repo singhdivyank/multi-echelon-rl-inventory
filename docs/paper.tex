@@ -63,31 +63,7 @@
 \maketitle
 
 \begin{abstract}
-Recent papers report that deep reinforcement-learning policies
-beat classical Operations Research heuristics on multi-echelon
-inventory control by \SIrange{10}{40}{\percent}.  Almost all of
-those numbers come from a single hand-crafted environment and a
-fixed baseline, which leaves the obvious question unanswered:
-is the RL agent really better, or is the baseline simply a straw
-man on that particular instance?  We take the two policy-gradient
-agents we built for this course project (PPO on a
-$1$-warehouse/$3$-retailer divergent chain, A3C on a $4$-node
-factory--middle--leaf MEIS) and run each of them on two
-environments that share the same observation and action spaces:
-the stationary benchmark we started from (Env-1) and a harder
-non-stationary variant (Env-2) with seasonal demand,
-cross-retailer correlation, stochastic lead times, supplier
-capacity caps and partial lost sales.  Against the analytical
-base-stock baseline, PPO's win jumps from \SI{36.76}{\percent}
-on Env-1 to \SI{94.20}{\percent} on Env-2; the extra margin
-mostly comes from the untuned baseline falling apart under
-shocks, not from PPO improving.  Against an $(s,S)$ baseline that
-is retuned per environment, A3C wins by \SI{1.64}{\percent} on
-Env-1 and then loses by \SI{21.79}{\percent} on Env-2.  Our
-takeaway: a single-environment win is not, on its own, evidence
-that the RL policy is better, and any deep-RL inventory result
-should come with at least one harder distributional variant and
-an equivalently-tuned baseline.
+Recent research reports that Deep Reinforcement Learning (DRL) policies beat classical Operations Research (OR) heuristics on multi-echelon inventory control by \SIrange{10}{40}{\percent}. Almost all the numbers come from a single hand-crafted environment and a fixed baseline, which leaves the obvious question unanswered: Is the RL agent really better, or is the baseline simply a straw man on that particular instance? We take the two policy gradient agents (PPO on a $1$-warehouse/$3$-retailer divergent chain, A3C on a $4$-node factory--middle--leaf MEIS) and run each of them on two environments that share the same observation and action spaces: the original stationary benchmark (Env-1) and a harder non-stationary variant (Env-2) with seasonal demand, stochastic lead times, supplier capacity caps, and partial lost sales. Against a fixed analytical baseline, PPO's win jumps from \SI{36.76}{\percent} on Env-1 to \SI{94.20}{\percent} on Env-2; the extra margin mostly comes from the untuned baseline collapsing under shocks. Against a $(s,S)$ baseline, A3C wins by \SI{1.64}{\percent} on Env-1 and then loses by \SI{21.79}{\percent} on Env-2. Our takeaway: a single-environment win is not, on its own, evidence that the RL policy is better, and any deep-RL inventory result should come with at least one harder distributional variant and an equivalently-tuned baseline.
 \end{abstract}
 
 % Clickable URL without the hyperref package (which aaai2026.sty forbids).
@@ -104,13 +80,7 @@ an equivalently-tuned baseline.
 % -----------------------------------------------------------------
 \section{Introduction}
 % -----------------------------------------------------------------
-Supply-chain operations are one of the larger line items on any
-manufacturing firm's books.  Inventory alone makes up
-\SIrange{20}{60}{\percent} of total assets for a typical
-manufacturer \citep{unyimadu2014inventory}, and inventory
-management is the part of the business that has to pick how much
-stock to keep at each tier so demand gets served at the lowest
-cost.  Written down, the objective is just
+Supply chain operations are among the largest line items on any manufacturing firm's books.  Inventory is usually managed to respond to fluctuations in demand and supply. It constitutes \SIrange{20}{60}{\percent} of total assets for a typical manufacturer \citep{unyimadu2014inventory}, and inventory management is the part of the business that has to pick how much stock to keep at each tier so demand gets served at the lowest cost. Written down, the objective is just
 \begin{equation}
 \min\;
 \mathbb{E}\!\left[\,\sum_{t=0}^{T-1}\!
@@ -118,83 +88,22 @@ cost.  Written down, the objective is just
 \right],
 \label{eq:intro-obj}
 \end{equation}
-where $C^{\text{hold}}$ is the cost of storing unsold inventory,
-$C^{\text{back}}$ is what you pay when demand walks in and cannot
-be served, and $C^{\text{ord}}$ is the fixed-plus-variable cost of
-placing a replenishment order.  A Multi-Echelon Inventory System
-(MEIS) solves this jointly across suppliers, manufacturers,
-warehouses and retailers, instead of one tier at a time.  That
-joint view is where the problem gets hard: a decision that looks
-sensible locally at one echelon can blow up cost a tier over.
+where $C^{\text{hold}}$ is the cost of storing unsold inventory, $C^{\text{back}}$ is what you pay when demand walks in and cannot be served, and $C^{\text{ord}}$ is the fixed-plus-variable cost of placing a replenishment order. A Multi-Echelon Inventory System
+(MEIS) solves this jointly across suppliers, manufacturers, warehouses, and retailers, instead of one tier at a time. That
+joint view is where the problem gets hard: a decision that looks sensible locally at one echelon can blow up and cost a tier over.
 
-Classical Operations Research has two textbook answers to this.
-The echelon base-stock policy and the $(s,S)$ reorder-point policy
-are both optimal under strict stationarity and i.i.d.\ demand
-(with fixed ordering cost in the $(s,S)$ case)
-\citep{clark1960optimal}.  Meta-heuristic extensions, e.g.\
-genetic algorithms \citep{grahl2016meta}, do a decent job on
-richer instances, but they carry two familiar caveats: no
-optimality guarantee, and a tendency to degrade whenever the
-underlying dynamics change.  Once demand becomes non-stationary,
-shocks appear or lead times grow heavy-tailed, both classes start
-to misfire, because their set-points are tuned against the
-\emph{mean} demand-over-lead-time and nothing else.
+Classical OR has two textbook answers to this.
+The echelon base-stock policy and the $(s,S)$ reorder-point policy (explained in section 2) are both optimal under strict stationarity and demand (this is the fundamental of baselines and was first proposed in 1960). Meta-heuristic extensions, e.g., genetic algorithms \citep{grahl2016meta}, do a decent job on richer instances, but they carry two familiar caveats: no optimality guarantee, and a tendency to degrade whenever the underlying dynamics change. Once demand becomes non-stationary, shocks appear or lead times grow heavy-tailed, both classes start to misfire, because their set-points are tuned against the \emph{mean} demand-over-lead-time and nothing else.
 
-Deep reinforcement learning \citep{sutton2018temporal} is
-appealing here for exactly that reason: a learned policy can, at
-least in principle, adapt to whatever dynamics the MDP happens to
-express.  Recent papers
-\citep{oroojlooyjadid2022deep,gijsbrechts2022can,geevers2024multi,hammler2022multi}
-report substantial wins over OR heuristics, often in the
-\SIrange{10}{40}{\percent} range.  Those comparisons tend to share
-a weakness, though: a single hand-crafted environment, and a
-baseline whose parameters are never re-tuned for that environment.
-It is then hard to tell how much of the gap is the RL agent
-actually being better versus the baseline being handicapped on a
-problem it would otherwise solve well.
+DRL \citep{sutton2018temporal} is appealing here for exactly that reason: a learned policy can, at least in principle, adapt to whatever dynamics the MDP happens to express. Recent papers \citep{oroojlooyjadid2022deep,gijsbrechts2022can,geevers2024multi,hammler2022multi} report substantial wins over OR heuristics. Those comparisons tend to share a weakness, a single hand-crafted environment, and a baseline whose parameters are never re-tuned for that environment. It is then hard to tell how much of the gap is the RL agent actually better versus the baseline being handicapped on a problem it would otherwise solve well.
 
-We started this project with a more modest setup: one
-policy-gradient agent per algorithm (PPO, A3C) on a single
-environment each (a divergent supply chain for PPO, a 4-node MEIS
-chain for A3C).  A reviewer at our poster session flagged exactly
-the concern above and asked whether the wins survived in a harder
-setting.  The present paper is our answer.  On top of the baseline
-story, three specific choices make the comparison informative:
+We begun with a more modest setup: one policy-gradient agent per algorithm (PPO, A3C) on a single environment each (a divergent supply chain for PPO, a 4-node MEIS chain for A3C).  A reviewer at our poster session flagged exactly the concern above and asked whether the wins survived in a harder setting. The present paper is our answer. On top of the baseline story, three specific choices make the comparison informative:
 \begin{enumerate}
-\item \emph{Continuous-action PPO.}  The PPO agent uses a fully
-      continuous $4$-dimensional action head (one normalised order
-      quantity per echelon), rather than the discretised grids
-      that most of the prior literature uses.
-\item \emph{Explicit backorder accounting.}  Both environments
-      carry unfulfilled demand as an ageing backlog and fold it
-      back into the cost signal, so the RL agent sees the same
-      shortage penalty that classical OR treats as a first-class
-      citizen.
-\item \emph{A shared distribution-shift harness.}  We build a
-      non-stationary second environment (Env-2) per benchmark
-      with seasonal demand, cross-retailer correlation, rare
-      multiplicative shocks, heavy-tailed lead times, stochastic
-      capacity caps and partial lost sales, but with exactly the
-      same observation and action spaces as Env-1.  The agent
-      code transfers without any change, and the Env-1
-      hyperparameters carry over to Env-2 verbatim, so whatever
-      cost differences we read off reflect dynamics rather than
-      tuning effort.
+\item \emph{Continuous-action PPO.} The PPO agent uses a fully continuous $4$-dimensional action head (one normalised order quantity per echelon), rather than the discretised grid that most of the prior literature uses.
+\item \emph{Explicit backorder accounting.}  Both environments carry unfulfilled demand as backlog and fold it back into the cost signal, so the RL agent sees the same shortage penalty that classical OR treats as a first-class citizen.
+\item \emph{A shared distribution-shift harness.} We build a non-stationary second environment (Env-2) per benchmark with seasonal demand, cross-retailer correlation, rare multiplicative shocks, heavy-tailed lead times, stochastic capacity caps, and partial lost sales, but with the same observation and action spaces as Env-1. The agent code transfers without any change, and the Env-1 hyperparameters carry over to Env-2 verbatim, so whatever cost differences we read off reflect dynamics rather than tuning effort.
 \end{enumerate}
-With that harness in place, the results split cleanly into one
-positive and one negative case.  PPO's margin over its fixed
-analytical baseline gets \emph{wider} on Env-2, while A3C's narrow
-Env-1 win over a retuned $(s,S)$ baseline flips into a decisive
-loss once the environment becomes harder.  Neither result on its
-own tells the whole story: the sign of a deep-RL-vs-heuristic
-comparison turns out to depend quite strongly on both the
-environment and how seriously the baseline is tuned.  The rest of
-the paper is laid out as follows.  Section~\ref{sec:bg} sets up
-the MDP, the two DRL algorithms and the OR baselines;
-Section~\ref{sec:rel} places the work in the literature;
-Section~\ref{sec:proj} gives the two environments formally;
-Section~\ref{sec:exp} walks through the four evaluation cells;
-Section~\ref{sec:conc} wraps up.
+With that harness in place, the results split cleanly into one positive and one negative case. PPO's margin over its fixed analytical baseline gets \emph{wider} on Env-2, while A3C's narrow Env-1 win over a retuned $(s,S)$ baseline flips into a decisive loss once the environment becomes harder. Neither result on its own tells the whole story: the sign of a deep-RL-vs-heuristic comparison turns out to depend quite strongly on both the environment and how seriously the baseline is tuned.  The rest of the paper is laid out as follows.  Section~\ref{sec:bg} sets up the MDP, the two DRL algorithms and the OR baselines; Section~\ref{sec:rel} places the work in the literature; Section~\ref{sec:proj} gives the two environments formally; Section~\ref{sec:exp} walks through the four evaluation cells; Section~\ref{sec:conc} wraps up.
 
 % -----------------------------------------------------------------
 \section{Background}
@@ -736,11 +645,6 @@ per-environment comparison.
 
 \begin{thebibliography}{10}
 \providecommand{\natexlab}[1]{#1}
-
-\bibitem[Clark and Scarf(1960)]{clark1960optimal}
-Clark, A.~J.; and Scarf, H. 1960.
-\newblock Optimal Policies for a Multi-Echelon Inventory Problem.
-\newblock \emph{Management Science}, 6(4): 475--490.
 
 \bibitem[Cobbe et~al.(2020)]{cobbe2020procgen}
 Cobbe, K.; Hesse, C.; Hilton, J.; and Schulman, J. 2020.
