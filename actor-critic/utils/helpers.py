@@ -2,6 +2,10 @@
 
 import json
 import os
+import re
+import sys
+from dataclasses import dataclass, fields
+from pathlib import Path
 from typing import Dict, Optional
 
 import yaml
@@ -20,9 +24,12 @@ def _get_complex_meis_env() -> Dict:
     with open('./configs/complexMeisConfig.yaml', 'r') as f:
         return yaml.safe_load(f)
 
-def _save_config(config_path: str, content: Dict):
+def _save_config(base_path, content: Dict):
     """Save training config as JSON"""
-
+    if isinstance(base_path, str):
+        config_path = os.path.join(base_path, 'config.json')
+    else:
+        config_path= base_path
     with open(config_path, 'w') as f:
         json.dump(content, f, indent=2)
     
@@ -75,3 +82,33 @@ def _read_metrics(metrics_path: str) -> Optional[Dict]:
             return training_history
     
     return None
+
+
+@dataclass
+class PathConfig:
+    checkpoint_path: str
+    best_model_path: str
+    history_path: str
+    rl_metrics_path: str
+    baseline_metrics_path: str
+    params_path: str
+    eval_res_path: str
+
+    def validate(self):
+        """Checks if all paths exist, otherwise exit the program"""
+        for field in fields(self):
+            path = getattr(self, field.name)
+            if not path.exists():
+                sys.exit(f"Critical Error: Required path not found at: {path}")
+        print("All paths validated successfully")
+
+def get_paths(dirs: Dict) -> PathConfig:
+    return PathConfig(
+        checkpoint_path = Path(dirs['checkpoints']) / 'checkpoint_final.pt',
+        best_model_path = Path(dirs['checkpoints']) / 'best_model.pt',
+        history_path = Path(dirs['checkpoints']) / 'training_history.json',
+        rl_metrics_path = Path(dirs['eval']) / 'rl_metrics.json',
+        baseline_metrics_path = Path(dirs['eval']) / 'baseline_metrics.json',
+        params_path = Path(dirs['logs']) / 'baseline_params.json',
+        eval_res_path = Path(dirs['logs']) / 'evaluation_results.json',
+    )

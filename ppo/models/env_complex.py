@@ -18,58 +18,62 @@ Only the *dynamics* are harder:
     6. Partial lost sales (a fraction of unmet demand is lost, not backlogged).
 """
 
-from typing import Dict
-
 import numpy as np
 
 from .env import DivergentInventoryEnv
+from utils.helpers import load_complex_config
 
 
 class ComplexDivergentInventoryEnv(DivergentInventoryEnv):
     """More realistic / stressful version of `DivergentInventoryEnv`."""
 
-    def __init__(self, config: Dict):
-        super().__init__(config)
-        self._get_complex_parameters(config)
-        # Shock bookkeeping
+    def __init__(self):
+        super().__init__()
+        self.config = load_complex_config()['complex']
+        self._get_complex_parameters()
+        # Shock book keeping
         self._shock_steps_remaining = 0
         self._shock_multiplier = 1.0
 
-    def _get_complex_parameters(self, config: Dict):
+    def _get_complex_parameters(self):
         """Pull complex-env-only hyperparameters with sane defaults."""
-        c = config
         # Seasonality
-        self.demand_base = float(c.get('demand_base', 10.0))
-        self.demand_amplitude = float(c.get('demand_amplitude', 0.6))
-        self.demand_period = float(c.get('demand_period', 120.0))
-        self.demand_trend = float(c.get('demand_trend', 0.0))
-        self.demand_noise_std = float(c.get('demand_noise_std', 2.0))
+        self._seasonality_params()
         # Correlation: shared latent factor strength in [0, 1]
-        self.demand_corr = float(c.get('demand_corr', 0.5))
+        self.demand_corr = float(self.config.get('demand_corr', 0.5))
         # Shocks
-        self.shock_prob = float(c.get('shock_prob', 0.01))
-        self.shock_multiplier_range = tuple(c.get('shock_multiplier_range', [2.0, 3.0]))
-        self.shock_duration_range = tuple(c.get('shock_duration_range', [3, 7]))
+        self.shock_prob = float(self.config.get('shock_prob', 0.01))
+        self.shock_multiplier_range = tuple(self.config.get('shock_multiplier_range', [2.0, 3.0]))
+        self.shock_duration_range = tuple(self.config.get('shock_duration_range', [3, 7]))
         # Stochastic lead time
-        self.lead_time_mean = float(c.get('lead_time_mean', 2.0))
-        self.lead_time_std = float(c.get('lead_time_std', 1.0))
-        self.lead_time_spike_prob = float(c.get('lead_time_spike_prob', 0.05))
-        self.lead_time_spike_extra = int(c.get('lead_time_spike_extra', 3))
-        self.lead_time_max = int(c.get('lead_time_max', 8))
+        self._lead_times()
         # Supplier capacity cap
-        self.supplier_capacity_mean = float(c.get('supplier_capacity_mean', 60.0))
-        self.supplier_capacity_std = float(c.get('supplier_capacity_std', 10.0))
-        self.warehouse_capacity_mean = float(c.get('warehouse_capacity_mean', 40.0))
-        self.warehouse_capacity_std = float(c.get('warehouse_capacity_std', 8.0))
+        self._supplier_cap()
         # Lost sales fraction of unmet demand
-        self.lost_sales_fraction = float(c.get('lost_sales_fraction', 0.3))
-        self.lost_sales_penalty = float(c.get('lost_sales_penalty', 5.0))
-        # Running lost-sales counter (for cost accounting + info)
+        self.lost_sales_fraction = float(self.config.get('lost_sales_fraction', 0.3))
+        self.lost_sales_penalty = float(self.config.get('lost_sales_penalty', 5.0))
+        # Running lost-sales counter
         self._lost_sales_step = 0.0
+    
+    def _seasonality_params(self):
+        self.demand_base = float(self.config.get('demand_base', 10.0))
+        self.demand_amplitude = float(self.config.get('demand_amplitude', 0.6))
+        self.demand_period = float(self.config.get('demand_period', 120.0))
+        self.demand_trend = float(self.config.get('demand_trend', 0.0))
+        self.demand_noise_std = float(self.config.get('demand_noise_std', 2.0))
+    
+    def _lead_times(self):
+        self.lead_time_mean = float(self.config.get('lead_time_mean', 2.0))
+        self.lead_time_std = float(self.config.get('lead_time_std', 1.0))
+        self.lead_time_spike_prob = float(self.config.get('lead_time_spike_prob', 0.05))
+        self.lead_time_spike_extra = int(self.config.get('lead_time_spike_extra', 3))
+        self.lead_time_max = int(self.config.get('lead_time_max', 8))
 
-    # ------------------------------------------------------------------ #
-    # Utility
-    # ------------------------------------------------------------------ #
+    def _supplier_cap(self):
+        self.supplier_capacity_mean = float(self.config.get('supplier_capacity_mean', 60.0))
+        self.supplier_capacity_std = float(self.config.get('supplier_capacity_std', 10.0))
+        self.warehouse_capacity_mean = float(self.config.get('warehouse_capacity_mean', 40.0))
+        self.warehouse_capacity_std = float(self.config.get('warehouse_capacity_std', 8.0))
 
     def _sample_lead_time(self) -> int:
         lt = self.np_random_normal(self.lead_time_mean, self.lead_time_std)
@@ -80,10 +84,6 @@ class ComplexDivergentInventoryEnv(DivergentInventoryEnv):
     def np_random_normal(self, mean: float, std: float) -> float:
         return float(np.random.normal(mean, std))
 
-    # ------------------------------------------------------------------ #
-    # Overridden dynamics
-    # ------------------------------------------------------------------ #
-
     def _generate_demand(self):
         """Seasonal, correlated, shock-prone demand."""
         t = self.current_step
@@ -92,7 +92,6 @@ class ComplexDivergentInventoryEnv(DivergentInventoryEnv):
         )
         mean_t = max(0.1, self.demand_base * season + self.demand_trend * t)
 
-        # Trigger a new shock window with some probability
         if self._shock_steps_remaining <= 0 and np.random.random() < self.shock_prob:
             self._shock_steps_remaining = int(
                 np.random.randint(self.shock_duration_range[0],
@@ -106,8 +105,7 @@ class ComplexDivergentInventoryEnv(DivergentInventoryEnv):
         active_mult = self._shock_multiplier if self._shock_steps_remaining > 0 else 1.0
         if self._shock_steps_remaining > 0:
             self._shock_steps_remaining -= 1
-
-        # Shared latent factor drives correlation across retailers.
+        
         shared = np.random.normal(0.0, self.demand_noise_std)
         idio = np.random.normal(0.0, self.demand_noise_std, size=self.num_retailers)
         noise = self.demand_corr * shared + np.sqrt(
@@ -116,8 +114,6 @@ class ComplexDivergentInventoryEnv(DivergentInventoryEnv):
 
         rates = np.maximum(0.1, mean_t * active_mult + noise)
         retailer_demands = np.random.poisson(rates).astype(float)
-
-        # Warehouse direct demand mirrors retailer scale but smaller.
         warehouse_rate = max(0.1, 0.3 * mean_t * active_mult)
         warehouse_demands = float(np.random.poisson(warehouse_rate))
         return warehouse_demands, retailer_demands
@@ -126,7 +122,7 @@ class ComplexDivergentInventoryEnv(DivergentInventoryEnv):
         """Supplier ships to warehouse, capped by stochastic capacity and
         with a stochastic lead time."""
         requested = max(0.0, float(orders[0]))
-        if requested <= 0:
+        if not requested:
             return
 
         cap = max(0.0, float(np.random.normal(

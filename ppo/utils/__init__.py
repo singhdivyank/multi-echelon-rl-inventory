@@ -1,5 +1,6 @@
 from .helpers import (
-    create_directories, 
+    create_directories,
+    get_paths, 
     load_config, 
     read_results,
     set_seeds, 
@@ -9,7 +10,7 @@ from .helpers import (
 )
 from .logger import Logger
 from .metrics import compute_confidence_interval, compute_gae
-from .visualise_helpers import (
+from .visualisation import (
     compare_ppo_baseline, 
     _plot_baseline, 
     _plot_loss, 
@@ -22,7 +23,8 @@ __all__ = [
     "compare_ppo_baseline", 
     "compute_confidence_interval", 
     "compute_gae",
-    "create_directories", 
+    "create_directories",
+    "get_paths", 
     "load_config", 
     "read_results", 
     "set_seeds", 

@@ -140,8 +140,8 @@ each other.
 
 ``` bash
 cd actor-critic
-python3 main.py --mode train --env meis      # train on Env-1 (original MEIS)
-python3 main.py --mode train --env complex   # train on Env-2 (non-stationary MEIS)
+python3 main.py --mode train --env meis      # train on Env-1
+python3 main.py --mode train --env complex   # train on Env-2
 python3 main.py --mode eval  --env meis      # evaluate on Env-1
 python3 main.py --mode eval  --env complex   # evaluate on Env-2
 ```
@@ -150,20 +150,10 @@ python3 main.py --mode eval  --env complex   # evaluate on Env-2
 
 ``` bash
 cd ppo
-python3 main.py --mode train --env divergent # train on Env-1 (divergent supply chain)
-python3 main.py --mode train --env complex   # train on Env-2 (non-stationary)
+python3 main.py --mode train --env divergent # train on Env-1
+python3 main.py --mode train --env complex   # train on Env-2
 python3 main.py --mode eval  --env divergent # evaluate on Env-1
 python3 main.py --mode eval  --env complex   # evaluate on Env-2
-```
-
-## Smoke test + report
-
-From the repo root:
-
-``` bash
-python scripts/smoke_env.py     # end-to-end sanity check for all 4 (algo, env) combos
-python scripts/make_report.py   # rebuild docs/report.md + figures from saved JSONs
-python scripts/build_paper.py   # rebuild docs/paper.pdf from docs/paper.tex (needs pdflatex)
 ```
 
 # Platform Independence

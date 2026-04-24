@@ -219,8 +219,8 @@ def evaluate_policy(agent, env, num_episodes: int):
 
 def eval_agents(
     config: Dict,
-    env_config: Dict,
-    checkpoint_path: str,
+    ppo_load_path: str,
+    baseline_path: str,
     device_name: str,
     env_name: str = 'divergent',
 ) -> Dict:
@@ -232,8 +232,7 @@ def eval_agents(
     print(f"Evaluating PPO on env '{env_name}'")
     print("="*80)
 
-    env_cls = ComplexDivergentInventoryEnv if env_name == 'complex' else DivergentInventoryEnv
-    env = env_cls(env_config)
+    env = ComplexDivergentInventoryEnv() if env_name == 'complex' else DivergentInventoryEnv()
     
     # Load PPO agent
     ppo_agent = PPOAgent(
@@ -242,7 +241,6 @@ def eval_agents(
         config=config,
         device=device_name
     )
-    ppo_load_path=os.path.join(checkpoint_path, 'ppo_divergent_final.pt')
     ppo_agent.load(ppo_load_path)
     print(f"PPO agent loaded from {ppo_load_path}")
     
@@ -262,7 +260,6 @@ def eval_agents(
 
     # Load Baseline agent
     baseline_agent = BaselineAgent(env)
-    baseline_path = os.path.join(checkpoint_path, 'baseline_divergent.npy')
     if os.path.exists(baseline_path):
         baseline_agent.load(baseline_path)
         print(f"Baseline agent loaded from {baseline_path}")

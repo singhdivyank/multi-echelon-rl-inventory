@@ -24,11 +24,13 @@ class Trainer:
     Trainer class for A3C agent on MEIS environment
     """
 
-    def __init__(self, env, agent, config: Dict, save_dir: str):
+    def __init__(self, env, agent, save_dir: str, config: Dict, history_path: str, best_model_path: str):
         self.env = env
         self.agent = agent
         self.config = config
         self.save_dir = save_dir
+        self.history_path = history_path
+        self.best_path = best_model_path
         os.makedirs(save_dir, exist_ok=True)
         self._get_parameters()
         self._for_logging_tracking()
@@ -69,16 +71,10 @@ class Trainer:
     def _find_latest_checkpoint(self):
         """
         Scan save_dir for the most recent checkpoint_ep*.pt file.
-        
-        Returns:
-            Path to latest checkpoint, or None if none found.
         """
-
-        if not os.path.isdir(self.save_dir):
-            return None
         
         pattern = re.compile(r'checkpoint_ep(\d+)\.pt$')
-        best_ep, best_path = -1, None
+        best_ep, self.latest_path = -1, None
 
         for fname in os.listdir(self.save_dir):
             m = pattern.match(fname)
@@ -86,9 +82,7 @@ class Trainer:
                 ep = int(m.group(1))
                 if ep > best_ep:
                     best_ep = ep
-                    best_path = os.path.join(self.save_dir, fname)
-        
-        return best_path
+                    self.latest_path = os.path.join(self.save_dir, fname)
     
     def _load_chkpt(self, path: str) -> int:
         """
@@ -167,14 +161,12 @@ class Trainer:
         if not len(self.episode_buffer['states']):
             return None
         
-        # Bootstrap -- get next values
         last_state = self.episode_buffer['states'][-1]
         state_tensor = torch.FloatTensor(last_state).to(self.agent.device)
         with torch.no_grad():
             _, next_val = self.agent.network.forward(state_tensor.unsqueeze(0))
             next_val = next_val.item()
         
-        # Compute advantage and returns
         advantages, returns = self.agent.compute_gae(
             self.episode_buffer['rewards'],
             self.episode_buffer['values'],
@@ -212,10 +204,8 @@ class Trainer:
         for _ in range(self.n_eval_episodes):
             state = self.env.reset()
             done = False
-            episode_reward = 0
-            episode_cost = 0
-            service_level_sum = 0
-            steps = 0
+            episode_reward, episode_cost = 0, 0
+            service_level_sum, steps = 0, 0
 
             while not done:
                 action, _, _ = self.agent.select_action(state, deterministic=True)
@@ -232,7 +222,7 @@ class Trainer:
         
         self.agent.train_mode()
 
-        eval_metrics = {
+        self.eval_metrics = {
             'mean_reward': np.mean(episode_rewards),
             'std_reward': np.std(episode_rewards),
             'mean_cost': np.mean(episode_costs),
@@ -241,10 +231,9 @@ class Trainer:
             'std_service_level': np.std(service_levels)
         }
         
-        self.training_history['eval_rewards'].append(eval_metrics['mean_reward'])
-        self.training_history['eval_costs'].append(eval_metrics['mean_cost'])
-        self.training_history['eval_service_levels'].append(eval_metrics['mean_service_level'])
-        return eval_metrics
+        self.training_history['eval_rewards'].append(self.eval_metrics['mean_reward'])
+        self.training_history['eval_costs'].append(self.eval_metrics['mean_cost'])
+        self.training_history['eval_service_levels'].append(self.eval_metrics['mean_service_level'])
     
     def _save_checkpoint(self, episode: int, final: bool = False):
         """Save model checkpoint with full training state for resuming."""
@@ -262,8 +251,6 @@ class Trainer:
     
     def _save_training_history(self):
         """Save training history to JSON"""
-
-        history_path = os.path.join(self.save_dir, 'training_history.json')
         history_json = {}
 
         for key, value in self.training_history.items():
@@ -274,10 +261,10 @@ class Trainer:
             else:
                 history_json[key] = value
             
-        with open(history_path, 'w') as f:
+        with open(self.history_path, 'w') as f:
             json.dump(history_json, f, indent=2)
         
-        print(f"Training history saved: {history_path}")
+        print(f"Training history saved: {self.history_path}")
 
     def train(self) -> Dict:
         """
@@ -291,10 +278,10 @@ class Trainer:
         """
 
         start_episode = 0
-        latest_chkpt = self._find_latest_checkpoint()
-        if latest_chkpt is not None:
-            start_episode = self._load_chkpt(latest_chkpt)
-            print(f"Resumed from checkpoint: {latest_chkpt} (episode {start_episode})")
+        self._find_latest_checkpoint()
+        if self.best_path is not None:
+            start_episode = self._load_chkpt(self.best_path)
+            print(f"Resumed from checkpoint: {self.best_path} (episode {start_episode})")
         
         print(f"Starting training for {self.n_episodes} episodes "
               f"(episodes {start_episode + 1}-{self.n_episodes})...")
@@ -314,7 +301,12 @@ class Trainer:
             recent_rewards.append(r)
         
         remaining = self.n_episodes - start_episode
-        pbar = tqdm(range(remaining), desc="Training", initial=0, total=remaining)
+        pbar = tqdm(
+            range(remaining), 
+            desc="Training", 
+            initial=0, 
+            total=remaining
+        )
         for i in pbar:
             episode = start_episode + i
             episode_metrics = self._run_episode()
@@ -339,25 +331,27 @@ class Trainer:
             
             # Evaluation
             if not (episode + 1) % self.eval_frequency:
-                eval_metrics = self._evaluate()
-                current_cost = eval_metrics['mean_cost']
+                self._evaluate()
+                current_cost = self.eval_metrics['mean_cost']
 
                 print(f"\nEvaluation at episode {episode + 1}:")
-                print(f"  Mean reward: {eval_metrics['mean_reward']:.2f} ± {eval_metrics['std_reward']:.2f}")
-                print(f"  Mean cost: {eval_metrics['mean_cost']:.2f} ± {eval_metrics['std_cost']:.2f}")
-                print(f"  Service level: {eval_metrics['mean_service_level']:.2%}")
+                print(f"  Mean reward: {self.eval_metrics['mean_reward']:.2f} ± {self.eval_metrics['std_reward']:.2f}")
+                print(f"  Mean cost: {self.eval_metrics['mean_cost']:.2f} ± {self.eval_metrics['std_cost']:.2f}")
+                print(f"  Service level: {self.eval_metrics['mean_service_level']:.2%}")
 
                 if current_cost < best_cost:
                     best_cost = current_cost
                     best_episode = episode + 1
-                    best_path = os.path.join(self.save_dir, "best_model.pt")
 
+                    if self.best_path is None:
+                        raise ValueError("Error: path is None. Check if the path config was initialized correctly.")
+                    
                     torch.save({
                         'network_state_dict': self.agent.network.state_dict(),
                         'optimizer_state_dict': self.agent.optimizer.state_dict(),
                         'episode': best_episode,
                         'best_cost': best_cost
-                    }, best_path)
+                    }, self.latest_path)
 
                     print(f"BEST model saved at episode {best_episode} with cost {best_cost:.2f}")
             

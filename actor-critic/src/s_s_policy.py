@@ -167,7 +167,7 @@ class sSPolicyTuner:
         self, 
         maxiter: int, 
         seed: Optional[int] = None
-    ) -> Tuple[Dict, float]:
+    ) -> Dict:
         """
         Tune policy parameters using differential evolution
         
@@ -178,7 +178,6 @@ class sSPolicyTuner:
         
         Returns:
             best_params: Best found parameters
-            best_cost: Best average cost
         """
 
         print("Tuning (s, S) policy parameters...")
@@ -205,4 +204,4 @@ class sSPolicyTuner:
             print(f" {wh}: s={params['s']:.0f}, S={params['S']:.0f}")
         print(f"Best average cost: {result.fun:.2f}")
 
-        return best_params, result.fun
+        return best_params

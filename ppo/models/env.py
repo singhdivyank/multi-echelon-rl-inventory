@@ -9,7 +9,9 @@ from typing import Dict, Tuple
 
 import gymnasium as gym
 import numpy as np
-from gymnasium import spaces
+from gym import spaces
+
+from utils.helpers import load_divergent_config
 
 
 class BaseInventoryEnv(gym.Env):
@@ -227,10 +229,10 @@ class BaseInventoryEnv(gym.Env):
         
 
 class DivergentInventoryEnv(BaseInventoryEnv):
-    def __init__(self, config: Dict):
-        self.config = config
+    def __init__(self):
+        self.config = load_divergent_config()['divergent']
         self.num_retailers = self.config['num_retailers']
-        super().__init__(config)
+        super().__init__(config=self.config)
         self._define_spaces()
         self.lead_time = 1
         self.in_transit_warehouse = []

@@ -4,6 +4,8 @@ Utility functions for model training and evaluation
 
 import json
 import os
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
@@ -14,6 +16,20 @@ def load_config() -> Dict:
     """Load configurations from YAML file"""
 
     with open('./configs/config.yaml', 'r') as f:
+        config = YAML().load(f)
+        return config
+
+def load_complex_config() -> Dict:
+    """Load configurations of complex environemnt from YAML file"""
+
+    with open('./configs/complexConfig.yaml', 'r') as f:
+        config = YAML().load(f)
+        return config
+
+def load_divergent_config() -> Dict:
+    """Load divergent env configurations from YAML file"""
+
+    with open('./configs/divergentConfig.yaml', 'r') as f:
         config = YAML().load(f)
         return config
 
@@ -89,3 +105,30 @@ def read_results(save_path: str) -> Dict:
         data = json.load(f)
     
     return data
+
+@dataclass
+class PathConfig:
+    best_model_path: str
+    stats_path: str
+    eval_path: str
+    train_stats_path: str
+    plot_path: str
+    comparison_path: str
+    ppo_save_path: str
+    baseline_save_path: str
+    metrics_path: str
+    log_dir: str
+
+def get_paths(dirs: Dict, env_name: str) -> PathConfig:
+    return PathConfig(
+        best_model_path = Path(dirs[1]) / 'ppo_divergent.pt',
+        stats_path = Path(dirs[0]) / 'training_stats.json',
+        eval_path = Path(dirs[0]) / 'evaluation_results.json',
+        train_stats_path = Path(dirs[0]) / 'training_stats.json',
+        plot_path = Path(dirs[-1]) / 'training_curves.png',
+        comparison_path = Path(dirs[-1]) / 'comparison.png',
+        ppo_save_path= Path(dirs[1]) / 'ppo_divergent_final.pt',
+        baseline_save_path = Path(dirs[1]) / 'baseline_divergent.npy',
+        metrics_path = Path(dirs[2], 'metrics.json'),
+        log_dir = Path(dirs[2]) / f"{env_name}"
+    )

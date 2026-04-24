@@ -12,6 +12,7 @@ from src.visualise import plot_comparison, plot_training_curves
 from src.train import train_agents
 from utils.helpers import (
     create_directories, 
+    get_paths,
     load_config,
     read_results,
     save_eval_results,
@@ -29,63 +30,51 @@ def main(args):
 
     seed_val = ppo_config['seed']
     set_seeds(seed_val)
-
     general_config = dict(config['general'])
-    # Scope save_dir per env so Env-1 artifacts are never clobbered.
-    base_save_dir = general_config['save_dir']
-    env_name = args.env
-    if env_name == 'divergent':
-        save_dir = base_save_dir
-    else:
-        save_dir = f"{base_save_dir.rstrip('/\\')}_{env_name}"
-    dirs = create_directories(save_dir)
-
+    save_dir = general_config['save_dir']
     device_name = set_device(general_config['device'])
-    env_config = dict(config[env_name])
+    
+    dirs = create_directories(save_dir)
+    env_name = args.env
+    _paths = get_paths(dirs=dirs, env_name=env_name)
 
     if args.mode == 'train':
-        best_model_path = os.path.join(dirs[1], 'ppo_divergent.pt')
-        stats_path = os.path.join(save_dir, 'training_stats.json')
         training_stats = train_agents(
-            env_config=env_config,
             config=ppo_config,
-            save_dirs=dirs,
+            log_dir = _paths.log_dir,
             device=device_name,
-            best_model_path=best_model_path,
+            best_model_path=_paths.best_model_path,
+            ppo_save_path=_paths.ppo_save_path,
+            baseline_save_path=_paths.baseline_save_path,
+            metrics_save_path=_paths.metrics_path,
             env_name=env_name,
         )
-        save_stats(stats=training_stats, save_path=stats_path)
-    elif args.mode == 'eval':
-        eval_path = os.path.join(save_dir, 'evaluation_results.json')
+        save_stats(stats=training_stats, save_path=_paths.stats_path)
+    else:
         eval_results = eval_agents(
             config=ppo_config,
-            env_config=env_config,
-            checkpoint_path=dirs[1],
+            ppo_load_path=_paths.ppo_save_path,
+            baseline_path=_paths.baseline_save_path,
             device_name=device_name,
             env_name=env_name,
         )
-        save_eval_results(results=eval_results, save_path=eval_path)
-    else:
-        eval_path = os.path.join(save_dir, 'evaluation_results.json')
-        train_stats_path = os.path.join(save_dir, 'training_stats.json')
-        plot_path = os.path.join(dirs[-1], 'training_curves.png')
-        comparison_path = os.path.join(dirs[-1], 'comparison.png')
+        save_eval_results(results=eval_results, save_path=_paths.eval_path)
 
         print("\nGenerating training plots...")
-        train_results = read_results(train_stats_path)
+        train_results = read_results(_paths.train_stats_path)
         plot_training_curves(
             ppo_stats=train_results['ppo'], 
             baseline_stats=train_results['baseline'], 
-            save_path=plot_path
+            save_path=_paths.plot_path
         )
-        print(f"Training curves saved to {plot_path}")
+        print(f"Training curves saved to {_paths.plot_path}")
 
         print("\nGenerating comparison plots...")
-        eval_results = read_results(eval_path)
+        eval_results = read_results(_paths.eval_path)
         plot_comparison(
             ppo_results=eval_results['ppo'], 
             baseline_results=eval_results['baseline'], 
-            save_path=comparison_path
+            save_path=_paths.comparison_path
         )
         print(f"Comparison plots saved to {eval_results}")
     
@@ -101,8 +90,8 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         default='train',
-        choices=['train', 'eval', 'plot'],
-        help='Mode: train, eval, or plot'
+        choices=['train', 'eval'],
+        help='Mode: train or eval'
     )
     parser.add_argument(
         '--env',

@@ -19,10 +19,6 @@ class BaselineAgent:
     def __init__(self, env):
         self.env = env
         self.state_dim = env.observation_space.shape[0]
-        # Pre-existing bug: this used to be `observation_space.shape[0]` (the
-        # state dim, 11), so the baseline returned 11-d actions of which only
-        # the first 4 were actually consumed by the env. Fix to the real
-        # action space so the (s,S) heuristic is evaluated correctly.
         self.action_dim = env.action_space.shape[0]
         self._init_base_stock_levels()
         self.episode_costs = []
@@ -36,9 +32,7 @@ class BaselineAgent:
             - Target inventory = average demand * lead time + safety stock
             - Safety stock = z * sqrt(lead_time) * std(demand)
         """
-
-        # Use complex-env effective demand when available, else fall back to
-        # the original divergent env's lambda_w_r.
+        
         if hasattr(self.env, 'demand_base'):
             peak_mult = 1.0 + getattr(self.env, 'demand_amplitude', 0.0)
             avg_demand = float(self.env.demand_base) * peak_mult

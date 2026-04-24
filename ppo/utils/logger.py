@@ -3,11 +3,10 @@ Logger with TensorBoard integration for tracking training progress
 """
 
 import json
-import numpy as np
 import os
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -17,10 +16,11 @@ class Logger:
     Logger for tracking training metrics and writing to TensorBoard
     """
     
-    def __init__(self, log_dir: str):
+    def __init__(self, log_dir: str, metrics_path: str):
         self.log_dir = log_dir
-        os.makedirs(log_dir, exist_ok=True)
-        self.writer = SummaryWriter(log_dir=log_dir)
+        self.metrics_path = metrics_path
+        os.makedirs(self.log_dir, exist_ok=True)
+        self.writer = SummaryWriter(log_dir=self.log_dir)
         self.log_to_file = True
         self.metrics = {
             'train': {},
@@ -126,8 +126,6 @@ class Logger:
     
     def save_metrics(self):
         """Save all metrics to JSON"""
-        metrics_path = os.path.join(self.log_dir, 'metrics.json')
-        
         # Convert metrics to serializable format
         serializable_metrics = {}
         for category, metrics_dict in self.metrics.items():
@@ -138,7 +136,7 @@ class Logger:
                     for step, value in values
                 ]
         
-        with open(metrics_path, 'w') as f:
+        with open(self.metrics_path, 'w') as f:
             json.dump(serializable_metrics, f, indent=2)
 
     def close(self):

@@ -1,0 +1,26 @@
+divergent:
+  structure: divergent
+  # Demand Parameters
+  lambda_w: 1
+  lambda_w_r: 10
+  d_i: Pois(Unif[5,15])
+  # Network Structure
+  K: 4
+  num_retailers: 3
+  # Cost Parameters
+  h_w: 1 # Warehouse holding cost
+  h_r: 1 # Retailer holding cost
+  b_w: 0 # Warehouse backorder cost
+  b_r: 19 # Retailer backorder cost
+  # State Space Upper Bounds
+  max_inventory_warehouse: 1000
+  max_inventory_buffer: 450
+  max_in_transit_w_r: 250
+  max_backorder_r: 150
+  max_outstanding_w: 300
+  max_orders_w: 30
+  # Episode parameters
+  max_steps: 500
+  warmup_steps: 100
+  it: 1000
+  ib: 450

@@ -21,7 +21,7 @@ def plot_training_curves(
         save_path: Path to save figure
     """
 
-    from utils.visualise_helpers import (
+    from utils.visualisation import (
         _plot_baseline, 
         _plot_with_confidence, 
         _plot_loss
@@ -88,7 +88,7 @@ def plot_comparison(ppo_results: Dict, baseline_results: Dict, save_path: str):
         save_path: Path to save figure
     """
 
-    from utils.visualise_helpers import compare_ppo_baseline
+    from utils.visualisation import compare_ppo_baseline
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 

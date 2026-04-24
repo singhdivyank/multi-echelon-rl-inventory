@@ -23,14 +23,12 @@ class MEISEnv(gym.Env):
     
     metadata = {'render.modes': ['human']}
     
-    def __init__(self, config: 'dict | None' = None):
+    def __init__(self):
         super(MEISEnv, self).__init__()
         self.ioh = {}
         self.open_orders = {}
         self.total_cost_history = []
-        # Allow caller to pass an already-parsed config (e.g. the complex env
-        # variant); otherwise fall back to the default meisConfig.yaml.
-        self.config = config if config is not None else _get_meis_env()
+        self.config = _get_meis_env()
         print('Warehouse Config: ', self.config)
         self.current_step = 0
         # self.np_random = np.random.RandomState(42)

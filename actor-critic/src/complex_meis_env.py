@@ -17,25 +17,27 @@ The complex-env-only parameters live in `configs/complexMeisConfig.yaml`.
 """
 
 from collections import deque
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 
 from src.meis_env import MEISEnv, WAREHOUSES, LEAF_WAREHOUSES
+from utils.helpers import _get_complex_meis_env
 
 
 class ComplexMEISEnv(MEISEnv):
     """Harder variant of `MEISEnv`."""
 
-    def __init__(self, config: Optional[Dict] = None):
-        super().__init__(config=config)
+    def __init__(self):
+        super().__init__()
+        self.config = _get_complex_meis_env()
         self._load_complex_params()
         self._shock_steps_remaining = 0
         self._shock_multiplier = 1.0
         self._lost_sales_step = 0.0
 
     def _load_complex_params(self):
-        complex_cfg = self.config.get('complex', {}) if isinstance(self.config, dict) else {}
+        complex_cfg = self.config.get('complex', {})
         # Seasonal demand around the leaf `demand_mean`.
         self.demand_amplitude = float(complex_cfg.get('demand_amplitude', 0.5))
         self.demand_period = float(complex_cfg.get('demand_period', 90.0))
@@ -56,10 +58,6 @@ class ComplexMEISEnv(MEISEnv):
         self.middle_capacity_std = float(complex_cfg.get('middle_capacity_std', 3000.0))
         # Lost sales
         self.lost_sales_penalty = float(complex_cfg.get('lost_sales_penalty', 3.0))
-
-    # ------------------------------------------------------------------ #
-    # Overridden dynamics
-    # ------------------------------------------------------------------ #
 
     def _seasonal_mean(self, base_mean: float) -> float:
         t = self.current_step
@@ -136,16 +134,13 @@ class ComplexMEISEnv(MEISEnv):
     def _process_delivery(self):
         """Same as base, but middle warehouse has a stochastic outbound
         capacity cap when shipping down to leaves on any given day."""
-        # Per-step capacity: middle can only ship this many units downstream.
-        middle_cap = max(
+        middle_cap_remaining = max(
             0.0,
             float(self.np_random.normal(self.middle_capacity_mean, self.middle_capacity_std)),
         )
-        middle_cap_remaining = middle_cap
 
         for warehouse in WAREHOUSES:
             upstream = 'factory' if warehouse == 'middle' else 'middle'
-            is_from_factory = (upstream == 'factory')
 
             for order in self.open_orders[warehouse]:
                 order['age'] += 1
@@ -160,7 +155,7 @@ class ComplexMEISEnv(MEISEnv):
 
             for order in arriving_today:
                 quantity = order['qty']
-                if is_from_factory:
+                if upstream == 'factory':
                     self.ioh[warehouse] += quantity
                 else:
                     available_stock = self.ioh[upstream]

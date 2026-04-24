@@ -10,8 +10,7 @@ Implements the training procedure with:
 
 import os
 
-from datetime import datetime
-from typing import Dict, List
+from typing import Dict
 from tqdm import tqdm
 
 import numpy as np
@@ -175,11 +174,13 @@ def train_ppo(
     return stats
 
 def train_agents(
-    env_config: Dict,
     config: Dict,
-    save_dirs: List[str],
+    log_dir: str,
     device: str,
     best_model_path: str,
+    ppo_save_path: str,
+    baseline_save_path: str,
+    metrics_save_path: str,
     env_name: str = 'divergent',
 ) -> Dict:
     """Train PPO and Baseline agents"""
@@ -191,18 +192,15 @@ def train_agents(
     print("="*80)
 
     # Create environment
-    env_cls = ComplexDivergentInventoryEnv if env_name == 'complex' else DivergentInventoryEnv
-    env = env_cls(config=env_config)
+    env = ComplexDivergentInventoryEnv() if env_name == 'complex' else DivergentInventoryEnv()
     print(f"\nEnvironment created:")
     print(f"  State dimension: {env.observation_space.shape[0]}")
     print(f"  Action dimension: {env.action_space.shape[0]}")
     print(f"  Max steps per episode: {env.max_steps}")
 
     # Create Logger
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = os.path.join(save_dirs[2], f'{env_name}_{timestamp}')
-    logger = Logger(log_dir)
-
+    logger = Logger(log_dir=log_dir, metrics_path=metrics_save_path)
+    
     # Train PPO agent
     print("\n" + "="*80)
     print("Training PPO Agent")
@@ -225,9 +223,7 @@ def train_agents(
         eval_episodes=config['eval_episodes'],
         best_model_path=best_model_path
     )
-    # save_dirs: [base, checkpoints, logs, plots]. Final model belongs in
-    # the checkpoints subdir, which is also where evaluate_agents() looks.
-    ppo_save_path = os.path.join(save_dirs[1], 'ppo_divergent_final.pt')
+    
     ppo_agent.save(ppo_save_path)
     print(f"\nPPO agent saved to {ppo_save_path}")
 
@@ -242,14 +238,11 @@ def train_agents(
         num_episodes=config['eval_episodes'],
         logger=logger
     )
-    baseline_save_path = os.path.join(save_dirs[1], 'baseline_divergent.npy')
     baseline_agent.save(baseline_save_path)
 
-    # Generate stats
-    stats = {
+    return {
         'ppo': ppo_stats,
         'baseline': baseline_stats,
         'config': config,
-        'env_config': {k: v for k, v in env_config.items() if not callable(v)},
+        'env_config': {k: v for k, v in env.config.items() if not callable(v)},
     }
-    return stats
